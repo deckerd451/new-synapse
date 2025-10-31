@@ -1,9 +1,14 @@
+// Load environment variables before anything else
+import "dotenv/config";
+
 // Making changes to this file is **STRICTLY** forbidden. Please add your routes in `userRoutes.ts` file.
-import { Hono } from 'hono';
-import { cors } from 'hono/cors';
-import { logger } from 'hono/logger';
-import { userRoutes, Env } from './user-routes'; // Import AppHono from user-routes
-import { GlobalDurableObject } from './core-utils';
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { logger } from "hono/logger";
+import { userRoutes, Env } from "./user-routes"; // Import AppHono from user-routes
+import { GlobalDurableObject } from "./core-utils";
+
+
 
 
 // Need to export GlobalDurableObject to make it available in wrangler
