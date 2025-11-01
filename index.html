@@ -2,29 +2,40 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="/new-synapse/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React + TS</title>
+    <title>New Synapse</title>
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- Safe error reporter: disabled in production -->
     <script>
-        window.addEventListener('error', (event) => {
-          const isOurAppError = event.filename && event.filename.startsWith(window.location.origin);
+      if (window.location.hostname === "localhost") {
+        window.addEventListener("error", (event) => {
+          const isOurAppError =
+            event.filename && event.filename.startsWith(window.location.origin);
           if (isOurAppError) {
-            navigator.sendBeacon('/api/client-errors', JSON.stringify({
-              message: event.message,
-              url: window.location.href,
-              userAgent: navigator.userAgent,
-              source: event.filename,
-              lineno: event.lineno,
-              colno: event.colno,
-              stack: event.error ? event.error.stack : null,
-              timestamp: new Date().toISOString()
-            }));
+            try {
+              navigator.sendBeacon("/api/client-errors", JSON.stringify({
+                message: event.message,
+                url: window.location.href,
+                userAgent: navigator.userAgent,
+                source: event.filename,
+                lineno: event.lineno,
+                colno: event.colno,
+                stack: event.error ? event.error.stack : null,
+                timestamp: new Date().toISOString(),
+              }));
+            } catch (err) {
+              console.warn("Error reporter skipped (local only).");
+            }
           }
         }, true);
+      }
     </script>
-    <script type="module" src="/src/main.tsx"></script>
+
+    <!-- ✅ Correct relative path for GitHub Pages -->
+    <script type="module" src="./src/main.tsx"></script>
   </body>
 </html>
