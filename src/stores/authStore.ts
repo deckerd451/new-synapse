@@ -26,18 +26,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setProfile: (profile) => set({ profile }),
 
   // ✉️ Magic link sign-in via Supabase
-  signIn: async (email) => {
-    try {
-      set({ loading: true });
-      const { error } = await supabase.auth.signInWithOtp({ email });
-      if (error) throw error;
-      toast.success("Check your email for the login link!");
-    } catch (error: any) {
-      toast.error(error.message || "Login failed.");
-    } finally {
-      set({ loading: false });
-    }
-  },
+ // ✉️ Magic link sign-in via Supabase (with proper redirect)
+signIn: async (email) => {
+  try {
+    set({ loading: true });
+
+    // Detect correct redirect path depending on environment
+    const baseUrl = import.meta.env.DEV ? "/" : "/new-synapse/";
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}${baseUrl}`, // ✅ fixes 404 redirect
+      },
+    });
+
+    if (error) throw error;
+    toast.success("Magic link sent! Check your email to log in.");
+  } catch (error: any) {
+    toast.error(error.message || "Login failed.");
+  } finally {
+    set({ loading: false });
+  }
+},
+
 
   // 🔍 Check current session
   checkUser: async () => {
