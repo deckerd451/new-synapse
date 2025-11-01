@@ -1,41 +1,25 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/new-synapse/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>New Synapse</title>
-  </head>
-  <body>
-    <div id="root"></div>
-
-    <!-- Safe error reporter: disabled in production -->
-    <script>
-      if (window.location.hostname === "localhost") {
-        window.addEventListener("error", (event) => {
-          const isOurAppError =
-            event.filename && event.filename.startsWith(window.location.origin);
-          if (isOurAppError) {
-            try {
-              navigator.sendBeacon("/api/client-errors", JSON.stringify({
-                message: event.message,
-                url: window.location.href,
-                userAgent: navigator.userAgent,
-                source: event.filename,
-                lineno: event.lineno,
-                colno: event.colno,
-                stack: event.error ? event.error.stack : null,
-                timestamp: new Date().toISOString(),
-              }));
-            } catch (err) {
-              console.warn("Error reporter skipped (local only).");
-            }
-          }
-        }, true);
+<script>
+  // Only report errors locally (disabled on GitHub Pages)
+  if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+    window.addEventListener("error", (event) => {
+      const isOurAppError =
+        event.filename && event.filename.startsWith(window.location.origin);
+      if (isOurAppError) {
+        try {
+          navigator.sendBeacon("/api/client-errors", JSON.stringify({
+            message: event.message,
+            url: window.location.href,
+            userAgent: navigator.userAgent,
+            source: event.filename,
+            lineno: event.lineno,
+            colno: event.colno,
+            stack: event.error ? event.error.stack : null,
+            timestamp: new Date().toISOString(),
+          }));
+        } catch (err) {
+          console.warn("Error reporter skipped (local only).");
+        }
       }
-    </script>
-
-    <!-- ✅ Correct relative path for GitHub Pages -->
-    <script type="module" src="./src/main.tsx"></script>
-  </body>
-</html>
+    }, true);
+  }
+</script>
