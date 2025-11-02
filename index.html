@@ -1,19 +1,17 @@
-<script>
-  // Enable only when developing locally
-  if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
-    window.addEventListener("error", (event) => {
-      try {
-        navigator.sendBeacon("/api/client-errors", JSON.stringify({
-          message: event.message,
-          source: event.filename,
-          lineno: event.lineno,
-          colno: event.colno,
-          stack: event.error?.stack || null,
-          timestamp: new Date().toISOString()
-        }));
-      } catch (err) {
-        console.warn("Local error reporter skipped:", err);
-      }
-    }, true);
-  }
-</script>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Synapse Link</title>
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  </head>
+
+  <body>
+    <!-- ✅ React mount point -->
+    <div id="root"></div>
+
+    <!-- ✅ Load your Vite + React app -->
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

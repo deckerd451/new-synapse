@@ -1,54 +1,33 @@
-/**
- * Wrangler config for the Cloudflare Durable Object template
- * STRICTLY DO NOT MODIFY THIS FILE - Hidden from AI to prevent breaking core functionality
- */
- {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "synapse-link-xsxteff58ghddh-orwvu0",
-	"main": "worker/index.ts",
-	"compatibility_date": "2025-04-24",
-	"assets": {
-		"not_found_handling": "single-page-application",
-		"run_worker_first": ["/api/*", "!/api/docs/*"]
-	},
-    "observability": {
-        "enabled": true
-    },
-
-    //
-    // Supabase configuration
-    // ----------------------
-    // The application has been refactored to use Supabase as its primary
-    // database and authentication layer rather than Cloudflare Durable
-    // Objects.  To allow the Cloudflare Worker (or any future backend)
-    // access to your Supabase instance, we define two environment
-    // variables here: `SUPABASE_URL` and `SUPABASE_ANON_KEY`.  These
-    // correspond to the URL of your Supabase project and the public anon
-    // key for client‑side access.  When running locally with Wrangler,
-    // these variables can be provided via a `.dev.vars` file or your
-    // shell environment.  When deploying to production, you should set
-    // these as secrets (e.g. via `wrangler secret put`) or through the
-    // configuration of your hosting provider.  Hardcoding them here is
-    // provided solely for demonstration purposes and should be avoided in
-    // real deployments.
-    "vars": {
-      "SUPABASE_URL": "https://hvmotpzhliufzomewzfl.supabase.co",
-      "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh2bW90cHpobGl1ZnpvbWV3emZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI1NzY2NDUsImV4cCI6MjA1ODE1MjY0NX0.foHTGZVtRjFvxzDfMf1dpp0Zw4XFfD-FPZK-zRnjc6s"
-    },
-    "durable_objects": {
-      "bindings": [
-        {
-          "name": "GlobalDurableObject",
-          "class_name": "GlobalDurableObject"
-        }
-      ]
-    },
-    "migrations": [
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "synapse-link-xsxteff58ghddh-orwvu0",
+  "main": "worker/index.ts",
+  "compatibility_date": "2025-04-24",
+  "compatibility_flags": ["nodejs_compat"],
+ "assets": {
+  "directory": "dist",
+  "binding": "ASSETS",
+  "not_found_handling": "single-page-application"
+},
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "SUPABASE_URL": "https://hvmotpzhliufzomewzfl.supabase.co",
+    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh2bW90cHpobGl1ZnpvbWV3emZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI1NzY2NDUsImV4cCI6MjA1ODE1MjY0NX0.foHTGZVtRjFvxzDfMf1dpp0Zw4XFfD-FPZK-zRnjc6s"
+  },
+  "durable_objects": {
+    "bindings": [
       {
-        "tag": "v1",
-        "new_sqlite_classes": [
-          "GlobalDurableObject"
-        ]
+        "name": "GlobalDurableObject",
+        "class_name": "GlobalDurableObject"
       }
     ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["GlobalDurableObject"]
+    }
+  ]
 }

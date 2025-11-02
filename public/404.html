@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="refresh" content="0; url=/new-synapse/" />
+    <script>
+      // For Supabase Magic Link redirects
+      const redirect = window.location.pathname.replace("/new-synapse", "");
+      const url = `/new-synapse/${redirect}${window.location.search}${window.location.hash}`;
+      window.location.replace(url);
+    </script>
+  </head>
+  <body></body>
+</html>
