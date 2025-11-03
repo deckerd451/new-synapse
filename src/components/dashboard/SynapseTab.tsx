@@ -8,11 +8,11 @@ import {
   Minimize2,
   Loader2,
   ServerCrash,
+  XCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useTheme } from "@/hooks/use-theme";
 import { toast } from "sonner";
-import { RealtimeChannel } from "@supabase/supabase-js";
 
 interface ProfileNode extends NodeObject {
   id: string;
@@ -20,23 +20,22 @@ interface ProfileNode extends NodeObject {
   imageUrl?: string;
   color: string;
   group: string;
+  skills?: string[];
 }
 
 export function SynapseTab() {
   const { isDark } = useTheme();
   const fgRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-
   const [graphData, setGraphData] = useState<{ nodes: ProfileNode[]; links: LinkObject[] }>({
     nodes: [],
     links: [],
   });
+  const [selectedNode, setSelectedNode] = useState<ProfileNode | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [savedView, setSavedView] = useState<any>(null);
   const [isFull, setIsFull] = useState(false);
-  const [activeBursts, setActiveBursts] = useState<Set<string>>(new Set());
 
   const skillColors = ["#FFD700", "#00FFFF", "#FF69B4", "#ADFF2F", "#FFA500", "#9370DB"];
   const getColorByGroup = (group: string) => {
@@ -46,7 +45,7 @@ export function SynapseTab() {
     return skillColors[idx];
   };
 
-  // 🧠 Fetch initial graph
+  // 🧠 Load graph data
   useEffect(() => {
     const fetchGraphData = async () => {
       setLoading(true);
@@ -64,34 +63,18 @@ export function SynapseTab() {
 
         const nodes: ProfileNode[] =
           profiles?.map((p, i) => {
-            let group = "General";
-            if (p.skills) {
-              try {
-                const arr =
-                  typeof p.skills === "string"
-                    ? p.skills.split(",").map((s) => s.trim())
-                    : Array.isArray(p.skills)
-                    ? p.skills
-                    : [];
-                if (arr.length > 0) group = arr[0];
-              } catch {
-                group = "General";
-              }
-            }
+            const group = Array.isArray(p.skills)
+              ? p.skills[0] || "General"
+              : typeof p.skills === "string"
+              ? p.skills.split(",")[0] || "General"
+              : "General";
             const color = getColorByGroup(group);
-            const angle = (i / profiles.length) * 2 * Math.PI;
-            const radius = 300;
-            const cx = Math.cos(angle) * radius;
-            const cy = Math.sin(angle) * radius;
-
             return {
               id: p.id,
               name: p.name || "Unnamed",
               imageUrl: p.image_url || undefined,
               color,
               group,
-              x: cx,
-              y: cy,
             };
           }) || [];
 
@@ -113,47 +96,7 @@ export function SynapseTab() {
     fetchGraphData();
   }, []);
 
-  // 🛰️ Supabase Realtime listener for new connections
-  useEffect(() => {
-    const channel: RealtimeChannel = supabase
-      .channel("realtime-connections")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "connections" },
-        (payload) => {
-          const newLink = payload.new;
-          if (!newLink) return;
-          const linkId = `${newLink.from_user_id}-${newLink.to_user_id}`;
-          console.log("⚡ New connection detected:", linkId);
-
-          // Add to active bursts for 3s glow
-          setActiveBursts((prev) => new Set(prev).add(linkId));
-          setTimeout(() => {
-            setActiveBursts((prev) => {
-              const copy = new Set(prev);
-              copy.delete(linkId);
-              return copy;
-            });
-          }, 3000);
-
-          // Optionally append link dynamically
-          setGraphData((prev) => ({
-            ...prev,
-            links: [
-              ...prev.links,
-              { source: newLink.from_user_id, target: newLink.to_user_id },
-            ],
-          }));
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  // 📏 Responsive sizing
+  // 📏 Handle sizing
   useEffect(() => {
     const updateDimensions = () => {
       if (containerRef.current) {
@@ -166,19 +109,19 @@ export function SynapseTab() {
     updateDimensions();
     window.addEventListener("resize", updateDimensions);
     return () => window.removeEventListener("resize", updateDimensions);
-  }, []);
+  }, [loading]);
 
-  // 🎨 Node Rendering — glowing technical style
+  // 🧬 Node Rendering
   const nodeCanvasObject = useCallback(
     (node: NodeObject, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const n = node as ProfileNode;
       const r = 5;
-      const gradient = ctx.createRadialGradient(n.x!, n.y!, 0, n.x!, n.y!, 20);
+      const gradient = ctx.createRadialGradient(n.x!, n.y!, 0, n.x!, n.y!, 18);
       gradient.addColorStop(0, `${n.color}AA`);
       gradient.addColorStop(1, "transparent");
       ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.arc(n.x!, n.y!, 20, 0, 2 * Math.PI);
+      ctx.arc(n.x!, n.y!, 18, 0, 2 * Math.PI);
       ctx.fill();
 
       // Core
@@ -198,58 +141,9 @@ export function SynapseTab() {
     [isDark]
   );
 
-  // ⚡ Link visual dynamics
-  const linkColor = (link: LinkObject) => {
-    const id = `${link.source}-${link.target}`;
-    return activeBursts.has(id)
-      ? "rgba(0,255,255,0.9)"
-      : "rgba(0,255,255,0.25)";
-  };
-
-  const linkDirectionalParticles = (link: LinkObject) =>
-    activeBursts.has(`${link.source}-${link.target}`) ? 12 : 3;
-
-  const linkDirectionalParticleWidth = (link: LinkObject) =>
-    activeBursts.has(`${link.source}-${link.target}`) ? 3 : 1.5;
-
-  const linkDirectionalParticleSpeed = (link: LinkObject) =>
-    activeBursts.has(`${link.source}-${link.target}`)
-      ? Math.random() * 0.02 + 0.015
-      : Math.random() * 0.008 + 0.004;
-
-  // 🎥 Camera controls
-  const saveCameraView = () => {
-    if (!fgRef.current) return;
-    const { x, y, k } = fgRef.current.zoom();
-    localStorage.setItem("synapse_view", JSON.stringify({ x, y, k }));
-    setSavedView({ x, y, k });
-    toast.success("View saved");
-  };
-
-  const loadCameraView = () => {
-    const stored = localStorage.getItem("synapse_view");
-    if (stored && fgRef.current) {
-      const { x, y, k } = JSON.parse(stored);
-      fgRef.current.zoom(k, { x, y }, 800);
-    }
-  };
-
-  const resetCamera = () => {
-    fgRef.current.zoomToFit(400, 60);
-  };
-
-  // 🖥️ Fullscreen toggle
-  const toggleFullscreen = () => {
-    setIsFull((prev) => !prev);
-    setTimeout(() => {
-      if (containerRef.current) {
-        setDimensions({
-          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight,
-        });
-      }
-    }, 400);
-  };
+  // 🎛️ Controls
+  const resetCamera = () => fgRef.current?.zoomToFit(400, 60);
+  const toggleFullscreen = () => setIsFull((p) => !p);
 
   return (
     <Card
@@ -259,13 +153,21 @@ export function SynapseTab() {
     >
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-cyan">
-          <Zap /> Synapse View —{" "}
-          <span className="text-sm text-muted-foreground">Technical Energy Network</span>
+          <Zap /> Synapse Network —{" "}
+          <span className="text-sm text-muted-foreground">Architectural Diagnostics</span>
         </CardTitle>
       </CardHeader>
 
       <CardContent ref={containerRef} className="relative flex-grow overflow-hidden">
-        <div className="synapse-bg" />
+        {/* Subtle technical grid background */}
+        <div
+          className="absolute inset-0 opacity-[0.04]"
+          style={{
+            backgroundImage:
+              "linear-gradient(0deg, rgba(0,255,255,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,255,0.4) 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
 
         {loading && (
           <div className="absolute inset-0 flex flex-col justify-center items-center bg-background/50">
@@ -290,33 +192,58 @@ export function SynapseTab() {
             graphData={graphData}
             nodeLabel={(n) => `${(n as ProfileNode).name} — ${(n as ProfileNode).group}`}
             nodeCanvasObject={nodeCanvasObject}
-            linkColor={linkColor}
-            linkDirectionalParticles={linkDirectionalParticles}
-            linkDirectionalParticleWidth={linkDirectionalParticleWidth}
-            linkDirectionalParticleSpeed={linkDirectionalParticleSpeed}
+            linkColor={() => "rgba(0,255,255,0.25)"}
+            linkDirectionalParticles={3}
+            linkDirectionalParticleWidth={1.5}
+            linkDirectionalParticleSpeed={() => Math.random() * 0.008 + 0.004}
             backgroundColor="transparent"
+            onNodeClick={(node) => setSelectedNode(node as ProfileNode)}
           />
         )}
 
-        {/* HUD Controls */}
+        {/* HUD controls */}
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-3 z-50">
-          <button onClick={resetCamera} className="hud-btn px-3 py-2 rounded text-cyan text-sm flex items-center gap-1">
+          <button
+            onClick={resetCamera}
+            className="hud-btn px-3 py-2 rounded text-cyan text-sm flex items-center gap-1"
+          >
             <RotateCcw className="w-4 h-4" /> Reset
-          </button>
-          <button onClick={saveCameraView} className="hud-btn px-3 py-2 rounded text-cyan text-sm flex items-center gap-1">
-            Save
-          </button>
-          <button onClick={loadCameraView} className="hud-btn px-3 py-2 rounded text-cyan text-sm flex items-center gap-1">
-            Load
           </button>
           <button
             onClick={toggleFullscreen}
             className="hud-btn px-3 py-2 rounded text-cyan text-sm flex items-center gap-1"
           >
-            {isFull ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}{" "}
+            {isFull ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
             {isFull ? "Exit" : "Full"}
           </button>
         </div>
+
+        {/* ⚙️ Node Info HUD */}
+        {selectedNode && (
+          <div className="absolute bottom-6 right-6 w-64 bg-black/70 border border-cyan/40 rounded-lg shadow-lg text-cyan p-4 backdrop-blur-sm animate-fade-in">
+            <div className="flex justify-between items-center mb-2">
+              <h3 className="font-mono text-base">{selectedNode.name}</h3>
+              <button onClick={() => setSelectedNode(null)} className="text-cyan/70 hover:text-cyan">
+                <XCircle size={16} />
+              </button>
+            </div>
+            {selectedNode.imageUrl && (
+              <img
+                src={selectedNode.imageUrl}
+                alt={selectedNode.name}
+                className="w-full h-32 object-cover rounded-md mb-2 border border-cyan/30"
+              />
+            )}
+            <p className="text-xs text-cyan/80">
+              <span className="uppercase tracking-wider text-cyan/60">Group: </span>
+              {selectedNode.group}
+            </p>
+            <p className="text-xs text-cyan/80 mt-1">
+              <span className="uppercase tracking-wider text-cyan/60">ID: </span>
+              {selectedNode.id.slice(0, 8)}…
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
