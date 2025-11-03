@@ -29,16 +29,28 @@ console.log("[Supabase] Initialized:", supabaseUrl);
 
 // 🧠 Ensure community record exists for logged-in user
 export async function ensureCommunityUser() {
-  try {
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData?.user) throw new Error("Not authenticated");
+  const user = authData.user;
 
-    if (userError || !user) {
-      console.warn("[ensureCommunityUser] No authenticated user found.");
-      return;
-    }
+  const { data: existing } = await supabase
+    .from("community")
+    .select("id")
+    .eq("email", user.email)
+    .maybeSingle();
+
+  if (!existing) {
+    const { error: insertError } = await supabase.from("community").insert({
+      email: user.email,
+      user_id: user.id,
+      name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    if (insertError) throw insertError;
+  }
+}
+
 
     // Check if a record exists for this user
     const { data: existing, error: fetchError } = await supabase
