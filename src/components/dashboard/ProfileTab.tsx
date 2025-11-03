@@ -68,42 +68,45 @@ export function ProfileTab() {
       .join(", ");
   };
 
-  // 🧭 Handle form submit
-  const onSubmit = async (data: ProfileFormValues) => {
-    if (!profile) return;
-    setLoading(true);
+ // 🧭 Handle form submit
+const onSubmit = async (data: ProfileFormValues) => {
+  if (!profile) return;
+  setLoading(true);
 
-    try {
-      await ensureCommunityUser();
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user;
+  try {
+    await ensureCommunityUser();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
 
-      const updates = {
-        name: data.name,
-        bio: data.bio || "",
-        skills: cleanSkills(data.skills),
-        updated_at: new Date().toISOString(),
-        user_id: user?.id || profile.user_id,
-        email: profile.email || user?.email || "",
-      };
+    const updates = {
+      name: data.name,
+      // ✅ Safely normalize the bio — prevents nulls or extra spaces
+      bio: typeof data.bio === "string" ? data.bio.trim() : "",
+      // ✅ Clean up skills list
+      skills: cleanSkills(data.skills),
+      updated_at: new Date().toISOString(),
+      user_id: user?.id || profile.user_id,
+      email: profile.email || user?.email || "",
+    };
 
-     const { data: updatedProfile, error } = await supabase
-  .from("community")
-  .update(updates)
-  .eq("id", profile.id)
-  .select("id, name, email, bio, skills, image_url, user_id, updated_at")
-  .single();
+    const { data: updatedProfile, error } = await supabase
+      .from("community")
+      .update(updates)
+      .eq("id", profile.id)
+      .select("id, name, email, bio, skills, image_url, user_id, updated_at")
+      .single();
 
-      if (error) throw error;
-      setProfile(updatedProfile);
-      toast.success("✅ Profile updated successfully!");
-    } catch (err: any) {
-      console.error("Error updating profile:", err);
-      toast.error(err.message || "Failed to update profile.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    if (error) throw error;
+    setProfile(updatedProfile);
+    toast.success("✅ Profile updated successfully!");
+  } catch (err: any) {
+    console.error("Error updating profile:", err);
+    toast.error(err.message || "Failed to update profile.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // 🖼️ Crop image to square
   const cropToSquare = (file: File): Promise<Blob> =>
