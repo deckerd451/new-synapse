@@ -117,4 +117,62 @@ canvas {
   pointer-events: none;
   border-radius: 8px;
 }
+/* === Tooltip & Data Probe === */
+.tooltip {
+  @apply rounded px-2 py-1 text-xs;
+  border: 1px solid rgba(0,255,255,0.25);
+  background: rgba(0,20,24,0.85);
+  color: hsl(var(--accent));
+  backdrop-filter: blur(6px) saturate(120%);
+  pointer-events: none;
+  max-width: 220px;
+  transition: opacity 0.15s ease-out;
+}
+.tooltip p {
+  margin: 0;
+}
+
+/* === Technical UI Utilities === */
+.glass {
+  background: rgba(8, 12, 16, 0.65);
+  backdrop-filter: blur(8px) saturate(120%);
+  border: 1px solid rgba(0,255,255,0.15);
+  box-shadow: 0 0 40px rgba(0,255,255,0.05) inset;
+}
+
+.hud-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0,255,255,0.55);
+}
+
+.kbd {
+  @apply px-1.5 py-0.5 rounded border;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  border-color: rgba(0, 255, 255, 0.25);
+  background: rgba(0, 20, 24, 0.5);
+  color: hsl(var(--accent));
+}
+
+/* === Fade & Glow Animations === */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fade-in 0.25s ease-out both; }
+
+@keyframes glow-ping {
+  0%   { box-shadow: 0 0 0 0 rgba(0,255,255,0.35); }
+  70%  { box-shadow: 0 0 0 8px rgba(0,255,255,0); }
+  100% { box-shadow: 0 0 0 0 rgba(0,255,255,0); }
+}
+.glow-ping { animation: glow-ping 1.6s cubic-bezier(.2,.8,.2,1) infinite; }
+
+/* === Accessibility === */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .glow-ping,
+  .synapse-bg { animation: none !important; }
+}
 
