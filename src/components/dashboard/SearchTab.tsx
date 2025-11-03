@@ -56,38 +56,70 @@ export function SearchTab() {
     fetchConnections();
   }, [user]);
 
-  // ⚡ Create new connection
-  const handleConnect = async (target: any) => {
-    if (!user) {
+  // ⚡ Create new connection (fixed version)
+const handleConnect = async (target: any) => {
+  try {
+    // Ensure the logged-in user exists in the community table
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData?.user) {
       toast.error('Please log in first');
       return;
     }
 
-    const toId = target.user_id || target.id;
-    const existing = connections.find(
-      (c) =>
-        (c.from_user_id === user.id && c.to_user_id === toId) ||
-        (c.to_user_id === user.id && c.from_user_id === toId)
-    );
+    const user = authData.user;
+    // Get the current user's community record
+    const { data: sourceProfile, error: sourceError } = await supabase
+      .from('community')
+      .select('id')
+      .eq('email', user.email)
+      .maybeSingle();
 
-    if (existing) {
-      toast.info(`Already ${existing.status || 'connected'}`);
+    if (sourceError) throw sourceError;
+    if (!sourceProfile) {
+      toast.error('Your community profile is missing.');
       return;
     }
 
-    const { error } = await supabase.from('connections').insert({
-      from_user_id: user.id,
-      to_user_id: toId,
-      type: 'generic',
+    // Get the target user's community ID
+    const toId = target.id || target.user_id;
+    if (!toId) {
+      toast.error('Target user not found.');
+      return;
+    }
+
+    // Prevent duplicates
+    const { data: existing, error: checkError } = await supabase
+      .from('connections')
+      .select('*')
+      .or(`source_user_id.eq.${sourceProfile.id},target_user_id.eq.${sourceProfile.id}`)
+      .or(`source_user_id.eq.${toId},target_user_id.eq.${toId}`)
+      .maybeSingle();
+
+    if (checkError) throw checkError;
+    if (existing) {
+      toast.info('You are already connected or pending.');
+      return;
+    }
+
+    // ✅ Insert connection using community IDs
+    const { error: insertError } = await supabase.from('connections').insert({
+      source_user_id: sourceProfile.id,
+      target_user_id: toId,
       status: 'pending',
+      type: 'generic',
+      created_at: new Date().toISOString(),
     });
 
-    if (error) toast.error(error.message);
-    else {
-      toast.success(`Connection request sent to ${target.name}`);
-      fetchConnections();
-    }
-  };
+    if (insertError) throw insertError;
+
+    toast.success(`Connection request sent to ${target.name}!`);
+    fetchConnections(); // refresh
+  } catch (err: any) {
+    console.error('Connection error:', err);
+    toast.error(err.message || 'Failed to connect.');
+  }
+};
+
 
   // ⭐ Endorse skill
   const handleEndorse = async (skill: string, target: any) => {
