@@ -113,51 +113,62 @@ export function SearchTab() {
   };
 
   const handleEndorse = async (skill: string, target: any) => {
-    try {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError || !authData?.user) {
-        toast.error("Please log in to endorse.");
-        return;
-      }
-
-      const { data: sourceProfile, error: profileError } = await supabase
-        .from("community")
-        .select("id")
-        .eq("email", authData.user.email)
-        .maybeSingle();
-
-      if (profileError) throw profileError;
-      if (!sourceProfile) {
-        toast.error("Your community profile is missing.");
-        return;
-      }
-
-      const fromId = sourceProfile.id;
-      const toId = target.user_id || target.id;
-      const already = endorsed[toId]?.includes(skill);
-      if (already) {
-        toast.info(`You already endorsed ${target.name} for ${skill}.`);
-        return;
-      }
-
-      const { error: insertError } = await supabase.from("endorsements").insert({
-        endorsed_by_user_id: fromId,
-        endorsed_user_id: toId,
-        skill,
-      });
-
-      if (insertError) throw insertError;
-
-      toast.success(`You endorsed ${target.name} for ${skill}!`);
-      setEndorsed((prev) => ({
-        ...prev,
-        [toId]: [...(prev[toId] || []), skill],
-      }));
-    } catch (err: any) {
-      console.error("Endorsement error:", err);
-      toast.error(err.message || "Failed to endorse.");
+  try {
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData?.user) {
+      toast.error("Please log in to endorse.");
+      return;
     }
-  };
+
+    const { data: sourceProfile, error: profileError } = await supabase
+      .from("community")
+      .select("id")
+      .eq("email", authData.user.email)
+      .maybeSingle();
+
+    if (profileError) throw profileError;
+    if (!sourceProfile) {
+      toast.error("Your community profile is missing.");
+      return;
+    }
+
+    const fromId = sourceProfile.id;
+    const toId = target.user_id || target.id;
+
+    // NEW: check server-side for existing endorsement
+    const { data: existing, error: checkError } = await supabase
+      .from("endorsements")
+      .select("id")
+      .eq("endorsed_by_user_id", fromId)
+      .eq("endorsed_user_id", toId)
+      .eq("skill", skill)
+      .maybeSingle();
+
+    if (checkError) throw checkError;
+    if (existing) {
+      toast.info(`You already endorsed ${target.name} for ${skill}.`);
+      return;
+    }
+
+    const { error: insertError } = await supabase.from("endorsements").insert({
+      endorsed_by_user_id: fromId,
+      endorsed_user_id: toId,
+      skill,
+    });
+
+    if (insertError) throw insertError;
+
+    toast.success(`You endorsed ${target.name} for ${skill}!`);
+    setEndorsed((prev) => ({
+      ...prev,
+      [toId]: [...(prev[toId] || []), skill],
+    }));
+  } catch (err: any) {
+    console.error("Endorsement error:", err);
+    toast.error(err.message || "Failed to endorse.");
+  }
+};
+
 
   const getConnectionStatus = (target: any) => {
     const toId = target.user_id || target.id;
