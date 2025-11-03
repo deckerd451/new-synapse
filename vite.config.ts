@@ -4,7 +4,10 @@ import path from "path";
 
 export default defineConfig({
   plugins: [react()],
-  base: "/new-synapse/", // ✅ required for GitHub Pages
+
+  // ✅ Hard-code GitHub Pages base path — this fixes 404 routing
+  base: "/new-synapse/",
+
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

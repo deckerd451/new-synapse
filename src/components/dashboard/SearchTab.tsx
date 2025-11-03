@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Search, Loader2, ServerCrash } from 'lucide-react';
 import { UserCard } from './UserCard';
 import { Profile } from '@shared/types';
-import { api } from '@/lib/api-client';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabaseClient';
+
 export function SearchTab() {
   const [searchType, setSearchType] = useState<'name' | 'skills'>('name');
   const [query, setQuery] = useState('');
@@ -14,27 +15,60 @@ export function SearchTab() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) {
       toast.info('Please enter a search query.');
       return;
     }
+
     setLoading(true);
     setError(null);
     setSearched(true);
     setResults([]);
+
     try {
-      const searchParams = new URLSearchParams({ [searchType]: query });
-      const data = await api<Profile[]>(`/api/profiles/search?${searchParams.toString()}`);
-      setResults(data);
+      let data: Profile[] | null = [];
+
+      if (searchType === 'name') {
+        // 🔍 Search by name (case-insensitive)
+        const { data: nameResults, error: nameError } = await supabase
+          .from('community')
+          .select('*')
+          .ilike('name', `%${query}%`);
+
+        if (nameError) throw nameError;
+        data = nameResults;
+      } else {
+        // 🔍 Search by skills (matches any skill substring)
+        const { data: skillsResults, error: skillsError } = await supabase
+          .from('community')
+          .select('*')
+          .or(
+            query
+              .split(',')
+              .map((skill) => `skills.cs.{${skill.trim()}}`)
+              .join(',')
+          );
+
+        if (skillsError) throw skillsError;
+        data = skillsResults;
+      }
+
+      setResults(data || []);
+      if (!data || data.length === 0) {
+        toast.info('No profiles found for your search.');
+      }
     } catch (err: any) {
+      console.error(err);
       setError(err.message || 'An unexpected error occurred.');
       toast.error(err.message || 'Search failed.');
     } finally {
       setLoading(false);
     }
   };
+
   return (
     <div className="space-y-6">
       <Card className="border-cyan/20 bg-background/50">
@@ -56,19 +90,32 @@ export function SearchTab() {
                 <option value="skills">By Skills</option>
               </select>
               <Input
-                placeholder={searchType === 'name' ? 'Enter a name...' : 'e.g., react, node, python'}
+                placeholder={
+                  searchType === 'name'
+                    ? 'Enter a name...'
+                    : 'e.g., react, node, python'
+                }
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="flex-grow"
               />
             </div>
-            <Button type="submit" disabled={loading} className="bg-cyan text-background hover:bg-cyan/90">
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+            <Button
+              type="submit"
+              disabled={loading}
+              className="bg-cyan text-background hover:bg-cyan/90"
+            >
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="mr-2 h-4 w-4" />
+              )}
               Search
             </Button>
           </form>
         </CardContent>
       </Card>
+
       <div>
         {loading && (
           <div className="flex justify-center items-center p-8">
@@ -76,6 +123,7 @@ export function SearchTab() {
             <p className="ml-4 text-muted-foreground">Searching the network...</p>
           </div>
         )}
+
         {error && (
           <div className="text-center p-8 bg-destructive/10 rounded-lg">
             <ServerCrash className="h-8 w-8 text-destructive mx-auto mb-2" />
@@ -83,12 +131,14 @@ export function SearchTab() {
             <p className="text-sm text-muted-foreground">{error}</p>
           </div>
         )}
+
         {!loading && !error && searched && results.length === 0 && (
           <div className="text-center p-8">
             <p className="text-lg font-medium">No profiles found.</p>
             <p className="text-muted-foreground">Try a different search query.</p>
           </div>
         )}
+
         {!loading && !error && results.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {results.map((profile) => (

@@ -4,7 +4,7 @@ enableMapSet();
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  createBrowserRouter,
+  createHashRouter,
   RouterProvider,
 } from "react-router-dom";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -13,7 +13,8 @@ import "@/index.css";
 import { HomePage } from "@/pages/HomePage";
 import { Toaster } from "@/components/ui/sonner";
 
-const router = createBrowserRouter([
+// ✅ Use HashRouter instead of BrowserRouter
+const router = createHashRouter([
   {
     path: "/",
     element: <HomePage />,
@@ -36,7 +37,7 @@ window.addEventListener("DOMContentLoaded", () => {
         </ErrorBoundary>
       </StrictMode>
     );
-    console.log("✅ React app mounted successfully");
+    console.log("✅ React app mounted successfully (HashRouter)");
   } else {
     console.error("❌ No #root element found!");
   }
