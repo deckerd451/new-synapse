@@ -123,37 +123,43 @@ const handleConnect = async (target: any) => {
 
 
 
-  // ⭐ Endorse skill
-  const handleEndorse = async (skill: string, target: any) => {
-    if (!user) {
-      toast.error('Please log in to endorse.');
-      return;
-    }
+ // ⭐ Endorse skill
+const handleEndorse = async (skill: string, target: any) => {
+  if (!user) {
+    toast.error('Please log in to endorse.');
+    return;
+  }
 
-    const targetId = target.user_id || target.id;
-    const already = endorsed[targetId]?.includes(skill);
-    if (already) {
-      toast.info(`You already endorsed ${target.name} for ${skill}.`);
-      return;
-    }
+  const targetId = target.user_id || target.id;
+  const already = endorsed[targetId]?.includes(skill);
+  if (already) {
+    toast.info(`You already endorsed ${target.name} for ${skill}.`);
+    return;
+  }
 
+  try {
     const { error } = await supabase.from('endorsements').insert({
-      endorser_id: user.id,
-      target_id: targetId,
+      endorsed_by_user_id: user.id, // ✅ correct column name
+      endorsed_user_id: targetId,   // ✅ correct column name
       skill,
     });
 
     if (error) {
+      console.error('Endorsement insert failed:', error);
       toast.error('Failed to endorse.');
-      console.error(error);
-    } else {
-      toast.success(`You endorsed ${target.name} for ${skill}!`);
-      setEndorsed((prev) => ({
-        ...prev,
-        [targetId]: [...(prev[targetId] || []), skill],
-      }));
+      return;
     }
-  };
+
+    toast.success(`You endorsed ${target.name} for ${skill}!`);
+    setEndorsed((prev) => ({
+      ...prev,
+      [targetId]: [...(prev[targetId] || []), skill],
+    }));
+  } catch (err) {
+    console.error('Endorsement error:', err);
+    toast.error('Failed to endorse.');
+  }
+};
 
   // 🧩 Helper: connection status
   const getConnectionStatus = (target: any) => {
