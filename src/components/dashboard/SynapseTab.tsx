@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import ForceGraph2D, { NodeObject, LinkObject } from "react-force-graph-2d";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Zap, Loader2, ServerCrash } from "lucide-react";
+import { Zap, Loader2, ServerCrash, RefreshCw, ZoomIn, ZoomOut, Shuffle } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useTheme } from "@/hooks/use-theme";
 import { toast } from "sonner";
 
-// =============== Types ===============
+// === Types ===
 interface ProfileNode extends NodeObject {
   id: string;
   name: string;
@@ -34,28 +34,24 @@ interface CommunityRow {
   y?: number | null;
 }
 
-// =============== Component ===============
 export function SynapseTab() {
   const { isDark } = useTheme();
-
   const [graphData, setGraphData] = useState<{ nodes: ProfileNode[]; links: LinkObject[] }>({
     nodes: [],
     links: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const fgRef = useRef<any>(null);
 
-  // --------- Color palette & grouping ----------
+  // === Visual settings ===
   const skillColors = ["#FFD700", "#00FFFF", "#FF69B4", "#ADFF2F", "#FFA500", "#9370DB"];
-
-  const colorFor = (group: string) => {
-    const h = Math.abs(group.split("").reduce((a, c) => a + c.charCodeAt(0), 0));
-    return skillColors[h % skillColors.length];
-  };
+  const colorFor = (group: string) =>
+    skillColors[
+      Math.abs(group.split("").reduce((a, c) => a + c.charCodeAt(0), 0)) % skillColors.length
+    ];
 
   const getFirstSkill = (skills: CommunityRow["skills"]) => {
     if (!skills) return "General";
@@ -73,7 +69,7 @@ export function SynapseTab() {
     return "General";
   };
 
-  // --------- Data fetch ----------
+  // === Fetch graph ===
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -94,27 +90,16 @@ export function SynapseTab() {
           profiles?.map((p, i) => {
             const group = getFirstSkill(p.skills);
             const color = colorFor(group);
-
-            let x: number | undefined = undefined;
-            let y: number | undefined = undefined;
-            if (typeof p.x === "number" && typeof p.y === "number") {
-              x = p.x;
-              y = p.y;
-            } else {
-              const angle = (i / count) * Math.PI * 2;
-              const radius = 300;
-              x = Math.cos(angle) * radius + (Math.random() - 0.5) * 40;
-              y = Math.sin(angle) * radius + (Math.random() - 0.5) * 40;
-            }
-
+            const radius = 350;
+            const angle = (i / count) * Math.PI * 2;
             return {
               id: p.id,
               name: p.name || "Unnamed",
               imageUrl: p.image_url || undefined,
               color,
               group,
-              x,
-              y,
+              x: p.x ?? Math.cos(angle) * radius,
+              y: p.y ?? Math.sin(angle) * radius,
             };
           }) || [];
 
@@ -127,16 +112,15 @@ export function SynapseTab() {
         setGraphData({ nodes, links });
       } catch (err: any) {
         console.error("Graph fetch error:", err);
-        const msg = err?.message || "Failed to load network data.";
-        setError(msg);
-        toast.error(msg);
+        toast.error(err.message || "Failed to load network data.");
+        setError(err.message);
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
-  // --------- Responsive sizing ----------
+  // === Resize handling ===
   useEffect(() => {
     const update = () => {
       if (!containerRef.current) return;
@@ -148,105 +132,116 @@ export function SynapseTab() {
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
-  }, [loading]);
+  }, []);
 
-  // --------- Camera persistence ----------
+  // === Camera persistence ===
   const saveCamera = useCallback(() => {
     if (!fgRef.current) return;
     const cam = fgRef.current.cameraPosition();
-    if (!cam) return;
-    localStorage.setItem("synapse_camera", JSON.stringify(cam));
+    if (cam) localStorage.setItem("synapse_camera", JSON.stringify(cam));
   }, []);
 
-  const debounceRef = useRef<number | null>(null);
-  const debouncedSaveCamera = useCallback(() => {
-    if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    debounceRef.current = window.setTimeout(saveCamera, 250);
-  }, [saveCamera]);
-
-  useEffect(() => {
-    if (!fgRef.current || !graphData.nodes.length) return;
+  const restoreCamera = useCallback(() => {
     const saved = localStorage.getItem("synapse_camera");
-    if (!saved) return;
+    if (!fgRef.current || !saved) return;
     try {
       const { x, y, z } = JSON.parse(saved);
       fgRef.current.cameraPosition({ x, y, z });
-    } catch {
-      /* ignore */
-    }
+    } catch {}
+  }, []);
+
+  // Restore on load
+  useEffect(() => {
+    if (graphData.nodes.length) setTimeout(restoreCamera, 500);
   }, [graphData]);
 
-  // --------- Node rendering ----------
+  // === Node rendering with halo ===
   const nodeCanvasObject = useCallback(
     (node: NodeObject, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const n = node as ProfileNode;
-      const label = n.name;
       const r = 5;
       const fontSize = 12 / globalScale;
 
+      // Glow halo
+      const gradient = ctx.createRadialGradient(n.x!, n.y!, r, n.x!, n.y!, r * 4);
+      gradient.addColorStop(0, `${n.color}cc`);
+      gradient.addColorStop(1, "transparent");
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(n.x!, n.y!, r * 4, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Node dot
       ctx.beginPath();
       ctx.arc(n.x!, n.y!, r, 0, 2 * Math.PI);
       ctx.fillStyle = n.color;
       ctx.fill();
 
+      // Label
       ctx.font = `${fontSize}px Sora`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = isDark ? "#E5E7EB" : "#1F2937";
-      ctx.fillText(label, n.x!, n.y! + r + 8 / globalScale);
+      ctx.fillStyle = isDark ? "#E5E7EB" : "#111";
+      ctx.fillText(n.name, n.x!, n.y! + r + 8 / globalScale);
     },
     [isDark]
   );
 
-  // --------- Persist node drag ----------
+  // === Persist drag ===
   const onNodeDragEnd = async (node: NodeObject) => {
     const n = node as ProfileNode;
     try {
-      const { error } = await supabase
-        .from("community")
-        .update({ x: n.x, y: n.y } as any)
-        .eq("id", n.id);
-      if (error) console.debug("[SynapseTab] Skipped persisting x/y:", error.message);
-    } catch (err) {
-      console.debug("[SynapseTab] Persist x/y failed:", (err as any)?.message);
-    }
+      await supabase.from("community").update({ x: n.x, y: n.y } as any).eq("id", n.id);
+    } catch {}
   };
 
-  // --------- Reset View Button Handler ----------
+  // === Delightful Controls ===
   const handleResetView = useCallback(() => {
     if (!fgRef.current || !graphData.nodes.length) return;
-
-    // Compute bounding box of current graph
     const bbox = fgRef.current.getGraphBbox();
     const center = {
       x: (bbox.x[0] + bbox.x[1]) / 2,
       y: (bbox.y[0] + bbox.y[1]) / 2,
-      z: Math.max(bbox.z[1] - bbox.z[0], bbox.y[1] - bbox.y[0]) * 0.9, // auto zoom level
+      z: Math.max(bbox.y[1] - bbox.y[0], bbox.x[1] - bbox.x[0]) * 0.8,
     };
-
     fgRef.current.cameraPosition(
       { x: center.x, y: center.y, z: center.z },
       { x: center.x, y: center.y, z: 0 },
-      1000 // ms animation
+      1000
     );
   }, [graphData]);
 
-  // --------- Render ----------
+  const handleZoom = (factor: number) => {
+    if (!fgRef.current) return;
+    const cam = fgRef.current.cameraPosition();
+    fgRef.current.cameraPosition(
+      { x: cam.x, y: cam.y, z: cam.z / factor },
+      { x: cam.x, y: cam.y, z: 0 },
+      400
+    );
+  };
+
+  const shuffleLayout = () => {
+    if (!fgRef.current) return;
+    fgRef.current.d3Force("charge").strength(-60);
+    fgRef.current.d3ReheatSimulation();
+  };
+
   return (
-    <Card className="border-cyan/20 bg-background/50 h-[70vh] flex flex-col">
+    <Card className="border-cyan/20 bg-background/50 h-[70vh] flex flex-col overflow-hidden relative animate-fade-in">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-cyan">
-          <Zap />
+          <Zap className="animate-pulse" />
           <span>Synapse View</span>
-          <span className="text-sm text-muted-foreground"> — clustered by skills</span>
+          <span className="text-sm text-muted-foreground"> — radiant & interactive</span>
         </CardTitle>
       </CardHeader>
 
       <CardContent ref={containerRef} className="flex-grow relative">
         {loading && (
-          <div className="absolute inset-0 flex flex-col justify-center items-center bg-background/50">
+          <div className="absolute inset-0 flex flex-col justify-center items-center bg-background/50 backdrop-blur-sm transition-all">
             <Loader2 className="h-8 w-8 text-cyan animate-spin" />
-            <p className="mt-4 text-muted-foreground">Building network visualization...</p>
+            <p className="mt-4 text-muted-foreground">Energizing network...</p>
           </div>
         )}
 
@@ -260,13 +255,39 @@ export function SynapseTab() {
 
         {!loading && !error && (
           <>
-            <button
-              className="absolute right-3 top-3 px-3 py-1 rounded bg-cyan-600 hover:bg-cyan-700 text-white text-xs shadow-md"
-              onClick={handleResetView}
-            >
-              Reset View
-            </button>
+            {/* Floating controls */}
+            <div className="absolute right-4 top-4 flex flex-col gap-2 z-10">
+              <button
+                onClick={handleResetView}
+                title="Recenter"
+                className="p-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-md transition transform hover:scale-105"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleZoom(1.2)}
+                title="Zoom In"
+                className="p-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-md transition transform hover:scale-105"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleZoom(0.8)}
+                title="Zoom Out"
+                className="p-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-md transition transform hover:scale-105"
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              <button
+                onClick={shuffleLayout}
+                title="Shuffle Layout"
+                className="p-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-md transition transform hover:scale-105"
+              >
+                <Shuffle className="w-4 h-4" />
+              </button>
+            </div>
 
+            {/* Force graph */}
             <ForceGraph2D
               ref={fgRef}
               width={dimensions.width}
@@ -278,11 +299,11 @@ export function SynapseTab() {
               linkDirectionalParticles={3}
               linkDirectionalParticleWidth={2}
               linkDirectionalParticleSpeed={() => Math.random() * 0.02 + 0.005}
-              linkColor={() => "rgba(0, 207, 255, 0.35)"}
+              linkColor={() => "rgba(0, 207, 255, 0.25)"}
               enableNodeDrag={true}
               onNodeDragEnd={onNodeDragEnd}
-              onZoomEnd={debouncedSaveCamera}
-              onEngineStop={debouncedSaveCamera}
+              onZoomEnd={saveCamera}
+              onEngineStop={saveCamera}
             />
           </>
         )}
