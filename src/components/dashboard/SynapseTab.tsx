@@ -1,18 +1,27 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import ForceGraph2D, { NodeObject, LinkObject } from "react-force-graph-2d";
+// src/components/dashboard/SynapseTab.tsx
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import ForceGraph2D, { ForceGraphMethods, LinkObject, NodeObject } from "react-force-graph-2d";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Zap,
-  Loader2,
-  ServerCrash,
-  RefreshCw,
-  ZoomIn,
-  ZoomOut,
-  Shuffle,
-} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Zap, Loader2, ServerCrash, ZoomIn, ZoomOut, RotateCcw, Camera, Snowflake, Layers } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useTheme } from "@/hooks/use-theme";
 import { toast } from "sonner";
+
+type CommunityRow = {
+  id: string;
+  name: string | null;
+  image_url: string | null;
+  skills?: string | string[] | null;
+};
+
+type ConnectionRow = {
+  id: string;
+  from_user_id: string;
+  to_user_id: string;
+};
 
 interface ProfileNode extends NodeObject {
   id: string;
@@ -20,372 +29,434 @@ interface ProfileNode extends NodeObject {
   imageUrl?: string;
   color: string;
   group: string;
-  x?: number;
-  y?: number;
+  // optional fixed position (for cluster mode)
   fx?: number;
   fy?: number;
 }
 
-interface ConnectionRow {
-  id: string;
-  from_user_id: string;
-  to_user_id: string;
+const LS_KEY_CAMERA = "synapse_camera_v1"; // {k, x, y}
+const GRID_BG =
+  "repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 24px), repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 24px)";
+
+const SKILL_COLORS = ["#FFD700", "#00FFFF", "#FF69B4", "#ADFF2F", "#FFA500", "#9370DB", "#00D1B2", "#F472B6"];
+
+function colorForGroup(group: string) {
+  const idx = Math.abs(group.split("").reduce((a, c) => a + c.charCodeAt(0), 0)) % SKILL_COLORS.length;
+  return SKILL_COLORS[idx];
 }
 
-interface CommunityRow {
-  id: string;
-  name: string | null;
-  image_url: string | null;
-  skills: string | string[] | null;
-  x?: number | null;
-  y?: number | null;
+function parseSkills(sk: CommunityRow["skills"]): string[] {
+  if (!sk) return [];
+  if (Array.isArray(sk)) return sk.map((s) => `${s}`.trim()).filter(Boolean);
+  const raw = `${sk}`.trim();
+  // tolerate {a,b} or JSON-ish or CSV
+  const cleaned = raw.replace(/^\{|\}$/g, "");
+  // try JSON array
+  try {
+    const maybe = JSON.parse(raw);
+    if (Array.isArray(maybe)) return maybe.map((s) => `${s}`.trim()).filter(Boolean);
+  } catch {}
+  return cleaned
+    .split(",")
+    .map((s) => s.replace(/^"(.*)"$/, "$1").trim())
+    .filter(Boolean);
 }
 
 export function SynapseTab() {
   const { isDark } = useTheme();
-  const [graphData, setGraphData] = useState<{ nodes: ProfileNode[]; links: LinkObject[] }>({
-    nodes: [],
-    links: [],
-  });
+  const fgRef = useRef<ForceGraphMethods>();
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const canvasUnderlayRef = useRef<HTMLCanvasElement>(null); // ambient
+  const [dims, setDims] = useState({ w: 0, h: 0 });
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const fgRef = useRef<any>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [energyPulse, setEnergyPulse] = useState(0);
-  const [ambientColor, setAmbientColor] = useState("rgba(0,255,255,0.25)");
-  const mousePos = useRef({ x: 0, y: 0 });
 
-  // === Skill palette ===
-  const skillColors = ["#FFD700", "#00FFFF", "#FF69B4", "#ADFF2F", "#FFA500", "#9370DB"];
+  const [baseNodes, setBaseNodes] = useState<ProfileNode[]>([]);
+  const [links, setLinks] = useState<LinkObject[]>([]);
 
-  const colorFor = (group: string) =>
-    skillColors[
-      Math.abs(group.split("").reduce((a, c) => a + c.charCodeAt(0), 0)) %
-        skillColors.length
-    ];
+  // HUD state
+  const [clusterMode, setClusterMode] = useState(true);
+  const [energyOn, setEnergyOn] = useState(true);
+  const [frozen, setFrozen] = useState(false);
 
-  const computeAmbientColor = (nodes: ProfileNode[]) => {
-    if (!nodes.length) return isDark ? "rgba(0,255,255,0.25)" : "rgba(255,215,0,0.25)";
-    const weights: Record<string, number> = {};
-    nodes.forEach((n) => (weights[n.color] = (weights[n.color] || 0) + 1));
-    const dominant = Object.entries(weights).sort((a, b) => b[1] - a[1])[0][0];
-    return isDark
-      ? dominant.replace(")", ",0.3)").replace("rgb", "rgba")
-      : dominant.replace(")", ",0.25)").replace("rgb", "rgba");
-  };
+  // camera state
+  const camera = useRef<{ k: number; x: number; y: number } | null>(null);
+  const [zoomK, setZoomK] = useState(1);
 
-  const getFirstSkill = (skills: CommunityRow["skills"]) => {
-    if (!skills) return "General";
-    if (Array.isArray(skills)) return skills[0] || "General";
-    try {
-      const maybe = JSON.parse(skills as string);
-      if (Array.isArray(maybe) && maybe.length) return String(maybe[0]);
-    } catch {
-      const parts = String(skills)
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      if (parts.length) return parts[0];
-    }
-    return "General";
-  };
+  // dims
+  useEffect(() => {
+    const recalc = () => {
+      if (!wrapperRef.current) return;
+      setDims({ w: wrapperRef.current.clientWidth, h: wrapperRef.current.clientHeight });
+    };
+    recalc();
+    window.addEventListener("resize", recalc);
+    return () => window.removeEventListener("resize", recalc);
+  }, []);
 
-  // === Fetch data ===
+  // ambient energy painter
+  useEffect(() => {
+    let raf = 0;
+    const cnv = canvasUnderlayRef.current;
+    if (!cnv) return;
+    const ctx = cnv.getContext("2d");
+    if (!ctx) return;
+
+    const LOOP = () => {
+      if (!cnv || !ctx) return;
+      cnv.width = dims.w || cnv.width;
+      cnv.height = dims.h || cnv.height;
+
+      // clear
+      ctx.clearRect(0, 0, cnv.width, cnv.height);
+
+      // breathing alpha
+      const t = Date.now() * 0.001;
+      const pulse = 0.35 + 0.25 * Math.sin(t * 1.2);
+
+      if (energyOn) {
+        // radial gradient energy field
+        const cx = cnv.width / 2;
+        const cy = cnv.height / 2;
+        const r = Math.max(cnv.width, cnv.height) * (0.55 + 0.05 * Math.sin(t * 0.8));
+
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        g.addColorStop(0, `rgba(0, 207, 255, ${0.10 + 0.10 * pulse})`);
+        g.addColorStop(1, `rgba(0, 0, 0, 0)`);
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // radiating scanlines
+        ctx.globalAlpha = 0.45 * (0.6 + 0.4 * pulse);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(0,207,255,0.35)";
+        const rings = 6;
+        for (let i = 1; i <= rings; i++) {
+          const rr = (r / rings) * i * (1 + 0.03 * Math.sin(t * 2 + i));
+          ctx.beginPath();
+          ctx.arc(cx, cy, rr, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      raf = requestAnimationFrame(LOOP);
+    };
+
+    raf = requestAnimationFrame(LOOP);
+    return () => cancelAnimationFrame(raf);
+  }, [dims.w, dims.h, energyOn]);
+
+  // fetch data
   useEffect(() => {
     (async () => {
-      setLoading(true);
-      setError(null);
       try {
-        const { data: profiles, error: profilesError } = await supabase
-          .from("community")
-          .select<CommunityRow>("id, name, image_url, skills, x, y");
-        if (profilesError) throw profilesError;
+        setLoading(true);
+        setError(null);
 
-        const { data: connections, error: connectionsError } = await supabase
-          .from("connections")
-          .select<ConnectionRow>("id, from_user_id, to_user_id");
-        if (connectionsError) throw connectionsError;
+        const [{ data: profiles, error: pErr }, { data: conns, error: cErr }] = await Promise.all([
+          supabase.from("community").select("id,name,image_url,skills"),
+          supabase.from("connections").select("id,from_user_id,to_user_id"),
+        ]);
+        if (pErr) throw pErr;
+        if (cErr) throw cErr;
 
-        const count = profiles?.length || 1;
         const nodes: ProfileNode[] =
-          profiles?.map((p, i) => {
-            const group = getFirstSkill(p.skills);
-            const color = colorFor(group);
-            const angle = (i / count) * Math.PI * 2;
-            const radius = 350;
+          (profiles as CommunityRow[]).map((p, idx, all) => {
+            const skills = parseSkills(p.skills);
+            const group = skills[0] || "General";
+            const color = colorForGroup(group);
+
+            // initial circular distribution for cluster pinning
+            const angle = (idx / Math.max(1, all.length)) * Math.PI * 2;
+            const radius = 360;
+            const fx = Math.cos(angle) * radius;
+            const fy = Math.sin(angle) * radius;
+
             return {
               id: p.id,
               name: p.name || "Unnamed",
               imageUrl: p.image_url || undefined,
               color,
               group,
-              x: p.x ?? Math.cos(angle) * radius,
-              y: p.y ?? Math.sin(angle) * radius,
+              // NOTE: pinning is applied conditionally below (clusterMode)
+              ...(clusterMode ? { fx, fy } : {}),
             };
           }) || [];
 
         const links: LinkObject[] =
-          connections?.map((c) => ({
+          (conns as ConnectionRow[]).map((c) => ({
             source: c.from_user_id,
             target: c.to_user_id,
           })) || [];
 
-        setGraphData({ nodes, links });
-        setAmbientColor(computeAmbientColor(nodes));
-      } catch (err: any) {
-        console.error("Graph fetch error:", err);
-        toast.error(err.message || "Failed to load network data.");
-        setError(err.message);
+        setBaseNodes(nodes);
+        setLinks(links);
+      } catch (e: any) {
+        console.error(e);
+        setError(e.message || "Failed to load network.");
+        toast.error(e.message || "Failed to load network.");
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // fetch once
 
-  // === Ambient parallax field ===
+  // cluster mode toggle effect (pin/unpin nodes)
+  const clusteredNodes = useMemo<ProfileNode[]>(() => {
+    if (!baseNodes.length) return [];
+    if (!clusterMode) {
+      // unpin nodes
+      return baseNodes.map(({ fx, fy, ...n }) => ({ ...n, fx: undefined, fy: undefined }));
+    }
+    return baseNodes; // already preset with fx, fy
+  }, [baseNodes, clusterMode]);
+
+  // freeze physics
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const resize = () => {
-      canvas.width = containerRef.current?.offsetWidth || window.innerWidth;
-      canvas.height = containerRef.current?.offsetHeight || window.innerHeight;
-    };
-    resize();
-    window.addEventListener("resize", resize);
-
-    const particles = Array.from({ length: 140 }, () => ({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      size: Math.random() * 2 + 0.5,
-      speed: Math.random() * 0.4 + 0.1,
-      drift: Math.random() * 0.3 - 0.15,
-    }));
-
-    let anim: number;
-    const draw = () => {
-      if (!ctx) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      const pulseIntensity = Math.min(1, energyPulse / 100);
-      const glow = ambientColor.replace(
-        /[\d.]+\)$/g,
-        `${0.15 + pulseIntensity * 0.3})`
-      );
-
-      particles.forEach((p) => {
-        // gentle parallax motion
-        p.y -= p.speed;
-        p.x += p.drift;
-        if (p.y < 0) p.y = canvas.height;
-        if (p.x < 0) p.x = canvas.width;
-        if (p.x > canvas.width) p.x = 0;
-
-        const dx = (mousePos.current.x - canvas.width / 2) * 0.0008;
-        const dy = (mousePos.current.y - canvas.height / 2) * 0.0008;
-
-        const offsetX = p.x + dx * p.size * 30;
-        const offsetY = p.y + dy * p.size * 30;
-
-        const gradient = ctx.createRadialGradient(offsetX, offsetY, 0, offsetX, offsetY, p.size * 10);
-        gradient.addColorStop(0, glow);
-        gradient.addColorStop(1, "transparent");
-
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(offsetX, offsetY, p.size * 10, 0, 2 * Math.PI);
-        ctx.fill();
-      });
-
-      setEnergyPulse((v) => Math.max(0, v - 1.5));
-      anim = requestAnimationFrame(draw);
-    };
-
-    draw();
-
-    const handleMouse = (e: MouseEvent) => {
-      mousePos.current = { x: e.clientX, y: e.clientY };
-    };
-    window.addEventListener("mousemove", handleMouse);
-
-    return () => {
-      cancelAnimationFrame(anim);
-      window.removeEventListener("mousemove", handleMouse);
-      window.removeEventListener("resize", resize);
-    };
-  }, [ambientColor, energyPulse]);
-
-  // === Responsive sizing ===
-  useEffect(() => {
-    const update = () => {
-      if (!containerRef.current) return;
-      setDimensions({
-        width: containerRef.current.offsetWidth,
-        height: containerRef.current.offsetHeight,
-      });
-    };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-
-  const saveCamera = useCallback(() => {
-    if (!fgRef.current) return;
-    const cam = fgRef.current.cameraPosition();
-    if (cam) localStorage.setItem("synapse_camera", JSON.stringify(cam));
-  }, []);
-
-  const restoreCamera = useCallback(() => {
-    const saved = localStorage.getItem("synapse_camera");
-    if (!fgRef.current || !saved) return;
+    const fg = fgRef.current;
+    if (!fg) return;
+    // quick freeze: kill charge + link forces
     try {
-      const { x, y, z } = JSON.parse(saved);
-      fgRef.current.cameraPosition({ x, y, z });
+      const charge = fg.d3Force("charge");
+      const link = fg.d3Force("link");
+      if (frozen) {
+        // weaken forces to near-zero
+        charge && // @ts-ignore
+          charge.strength(0);
+        link && // @ts-ignore
+          link.distance(0).strength(0);
+      } else {
+        // restore typical-ish forces
+        charge && // @ts-ignore
+          charge.strength(-60);
+        link && // @ts-ignore
+          link.distance(50).strength(0.1);
+      }
+      // reheat
+      // @ts-ignore
+      fg.d3ReheatSimulation && fg.d3ReheatSimulation();
+    } catch {}
+  }, [frozen]);
+
+  // camera persistence
+  const handleZoom = useCallback((transform: { k: number; x: number; y: number }) => {
+    camera.current = transform;
+    setZoomK(transform.k);
+  }, []);
+  const handleZoomEnd = useCallback((transform: { k: number; x: number; y: number }) => {
+    camera.current = transform;
+    try {
+      localStorage.setItem(LS_KEY_CAMERA, JSON.stringify(transform));
     } catch {}
   }, []);
 
+  // restore camera on first mount
   useEffect(() => {
-    if (graphData.nodes.length) setTimeout(restoreCamera, 500);
-  }, [graphData]);
+    const fg = fgRef.current;
+    if (!fg) return;
+    const restore = () => {
+      try {
+        const saved = localStorage.getItem(LS_KEY_CAMERA);
+        if (!saved) return;
+        const { k, x, y } = JSON.parse(saved);
+        // centerAt uses graph coords; zoom() uses k directly
+        fg.zoom(k, 0);
+        // to preserve x/y, emulate d3-zoom's translate by using centerAt with no animation
+        // estimate center by inverting x,y: screen transform = translate(x,y) scale(k)
+        // A simpler user-friendly restore: zoom then fit center:
+        // But we'll try to approximate:
+        setTimeout(() => {
+          fg.centerAt((-x + dims.w / 2) / k, (-y + dims.h / 2) / k, 0);
+        }, 0);
+      } catch {}
+    };
+    // delay till first render
+    const t = setTimeout(restore, 60);
+    return () => clearTimeout(t);
+  }, [dims.w, dims.h]);
 
+  // canvas node rendering (technical label)
   const nodeCanvasObject = useCallback(
     (node: NodeObject, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const n = node as ProfileNode;
-      const r = 5;
-      const fontSize = 12 / globalScale;
-
-      const gradient = ctx.createRadialGradient(n.x!, n.y!, r, n.x!, n.y!, r * 4);
-      gradient.addColorStop(0, `${n.color}aa`);
-      gradient.addColorStop(1, "transparent");
-      ctx.fillStyle = gradient;
+      const r = 4;
+      // halo
       ctx.beginPath();
-      ctx.arc(n.x!, n.y!, r * 4, 0, 2 * Math.PI);
+      ctx.arc(n.x!, n.y!, r + 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0, 207, 255, 0.25)";
       ctx.fill();
 
+      // core
       ctx.beginPath();
-      ctx.arc(n.x!, n.y!, r, 0, 2 * Math.PI);
+      ctx.arc(n.x!, n.y!, r, 0, Math.PI * 2);
       ctx.fillStyle = n.color;
       ctx.fill();
 
-      ctx.font = `${fontSize}px Sora`;
+      // label
+      const label = n.name;
+      const fontSize = Math.max(8, 12 / globalScale);
+      ctx.font = `${fontSize}px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace`;
       ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = isDark ? "#E5E7EB" : "#111";
-      ctx.fillText(n.name, n.x!, n.y! + r + 8 / globalScale);
+      ctx.textBaseline = "top";
+      ctx.fillStyle = isDark ? "rgba(229,231,235,0.95)" : "rgba(31,41,55,0.95)";
+      ctx.fillText(label, n.x!, n.y! + r + 2);
     },
     [isDark]
   );
 
-  const pulse = (intensity = 80) => setEnergyPulse(intensity);
+  // link color & particles (energy reacts)
+  const linkColor = useCallback(() => (energyOn ? "rgba(0,207,255,0.35)" : "rgba(0,207,255,0.18)"), [energyOn]);
+  const particleWidth = useCallback(() => (energyOn ? 1.6 : 0), [energyOn]);
+  const particleSpeed = useCallback(() => (energyOn ? Math.random() * 0.012 + 0.006 : 0), [energyOn]);
 
-  const handleResetView = useCallback(() => {
-    if (!fgRef.current || !graphData.nodes.length) return;
-    const bbox = fgRef.current.getGraphBbox();
-    const center = {
-      x: (bbox.x[0] + bbox.x[1]) / 2,
-      y: (bbox.y[0] + bbox.y[1]) / 2,
-      z: Math.max(bbox.y[1] - bbox.y[0], bbox.x[1] - bbox.x[0]) * 0.9,
-    };
-    fgRef.current.cameraPosition(
-      { x: center.x, y: center.y, z: center.z },
-      { x: center.x, y: center.y, z: 0 },
-      1000
-    );
-    pulse();
-  }, [graphData]);
-
-  const handleZoom = (factor: number) => {
-    if (!fgRef.current) return;
-    const cam = fgRef.current.cameraPosition();
-    fgRef.current.cameraPosition(
-      { x: cam.x, y: cam.y, z: cam.z / factor },
-      { x: cam.x, y: cam.y, z: 0 },
-      400
-    );
-    pulse(60);
-  };
-
-  const shuffleLayout = () => {
-    if (!fgRef.current) return;
-    fgRef.current.d3Force("charge").strength(-60);
-    fgRef.current.d3ReheatSimulation();
-    pulse(90);
-  };
-
-  const onNodeDragEnd = async (node: NodeObject) => {
-    const n = node as ProfileNode;
-    pulse(100);
+  // HUD handlers
+  const doReset = () => {
+    const fg = fgRef.current;
+    if (!fg) return;
+    fg.zoomToFit(400, 40, (n: NodeObject) => true);
+    // also clear saved camera
     try {
-      await supabase.from("community").update({ x: n.x, y: n.y } as any).eq("id", n.id);
+      localStorage.removeItem(LS_KEY_CAMERA);
     } catch {}
+  };
+  const doZoom = (dir: 1 | -1) => {
+    const fg = fgRef.current;
+    if (!fg) return;
+    const newK = Math.min(8, Math.max(0.15, zoomK * (dir === 1 ? 1.25 : 0.8)));
+    fg.zoom(newK, 200);
+  };
+  const doSnapshot = () => {
+    if (!wrapperRef.current) return;
+    const canvas = wrapperRef.current.querySelector("canvas");
+    if (!canvas) {
+      toast.error("No canvas to capture.");
+      return;
+    }
+    const url = (canvas as HTMLCanvasElement).toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "synapse-snapshot.png";
+    a.click();
   };
 
   return (
-    <Card className="border-cyan/20 bg-background/50 h-[70vh] flex flex-col overflow-hidden relative animate-fade-in">
+    <Card className="border-cyan/20 bg-background/50 h-[70vh] flex flex-col overflow-hidden">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-cyan">
-          <Zap className="animate-pulse" />
-          <span>Synapse View</span>
-          <span className="text-sm text-muted-foreground">
-            — adaptive, reactive, parallax
-          </span>
+          <Zap className="shrink-0" />
+          <span>Synapse Console</span>
+          <span className="text-xs text-muted-foreground ml-2">technical view · clustered by skills</span>
         </CardTitle>
       </CardHeader>
 
-      <CardContent ref={containerRef} className="flex-grow relative">
-        <canvas ref={canvasRef} className="absolute inset-0 z-0 pointer-events-none transition-all duration-500" />
+      <CardContent className="relative flex-1 p-0">
+        {/* technical grid background */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: GRID_BG,
+            backgroundSize: "auto, auto",
+            opacity: 0.22,
+            pointerEvents: "none",
+          }}
+        />
 
-        {loading && (
-          <div className="absolute inset-0 flex flex-col justify-center items-center bg-background/50 backdrop-blur-sm z-10">
-            <Loader2 className="h-8 w-8 text-cyan animate-spin" />
-            <p className="mt-4 text-muted-foreground">Energizing network...</p>
-          </div>
-        )}
+        {/* ambient energy underlay */}
+        <canvas ref={canvasUnderlayRef} className="absolute inset-0 w-full h-full pointer-events-none" />
 
-        {error && (
-          <div className="absolute inset-0 flex flex-col justify-center items-center bg-destructive/10 rounded-lg z-10">
-            <ServerCrash className="h-8 w-8 text-destructive mx-auto mb-2" />
-            <p className="text-destructive-foreground font-semibold">Network Error</p>
-            <p className="text-sm text-muted-foreground">{error}</p>
-          </div>
-        )}
+        {/* graph container */}
+        <div ref={wrapperRef} className="relative w-full h-full">
+          {loading && (
+            <div className="absolute inset-0 flex flex-col justify-center items-center bg-background/70 z-10">
+              <Loader2 className="h-8 w-8 text-cyan animate-spin" />
+              <p className="mt-4 text-muted-foreground">Building network…</p>
+            </div>
+          )}
 
-        {!loading && !error && (
-          <>
-            {/* Controls */}
-            <div className="absolute right-4 top-4 flex flex-col gap-2 z-20">
-              <button onClick={handleResetView} title="Recenter" className="p-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-md transition transform hover:scale-110"><RefreshCw className="w-4 h-4" /></button>
-              <button onClick={() => handleZoom(1.2)} title="Zoom In" className="p-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-md transition transform hover:scale-110"><ZoomIn className="w-4 h-4" /></button>
-              <button onClick={() => handleZoom(0.8)} title="Zoom Out" className="p-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-md transition transform hover:scale-110"><ZoomOut className="w-4 h-4" /></button>
-              <button onClick={shuffleLayout} title="Shuffle Layout" className="p-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-md transition transform hover:scale-110"><Shuffle className="w-4 h-4" /></button>
+          {error && (
+            <div className="absolute inset-0 flex flex-col justify-center items-center bg-destructive/10 rounded-lg z-10">
+              <ServerCrash className="h-8 w-8 text-destructive mx-auto mb-2" />
+              <p className="text-destructive-foreground font-semibold">Network Error</p>
+              <p className="text-sm text-muted-foreground">{error}</p>
+            </div>
+          )}
+
+          {!loading && !error && (
+            <ForceGraph2D
+              ref={fgRef as any}
+              width={dims.w}
+              height={dims.h}
+              graphData={{ nodes: clusteredNodes, links }}
+              nodeLabel={(n) => {
+                const nn = n as ProfileNode;
+                return `${nn.name}\n${nn.group}`;
+              }}
+              nodeCanvasObject={nodeCanvasObject}
+              backgroundColor="transparent"
+              linkColor={linkColor}
+              linkDirectionalParticles={1}
+              linkDirectionalParticleWidth={particleWidth}
+              linkDirectionalParticleSpeed={particleSpeed}
+              enableNodeDrag // keep drag
+              onZoom={handleZoom}
+              onZoomEnd={handleZoomEnd}
+            />
+          )}
+
+          {/* HUD (bottom-center) */}
+          <div className="pointer-events-auto absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
+            <div className="flex items-center gap-3 rounded-2xl bg-black/50 backdrop-blur-md border border-cyan/30 px-4 py-3 shadow-[0_0_20px_rgba(0,207,255,0.15)]">
+              <Button variant="outline" size="icon" onClick={() => doZoom(-1)} className="border-cyan/40">
+                <ZoomOut className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="icon" onClick={() => doZoom(1)} className="border-cyan/40">
+                <ZoomIn className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" onClick={doReset} className="border-cyan/40 gap-2">
+                <RotateCcw className="w-4 h-4" />
+                Reset
+              </Button>
+
+              <div className="w-px h-6 bg-cyan/30 mx-1" />
+
+              <div className="flex items-center gap-2">
+                <Switch id="energy" checked={energyOn} onCheckedChange={setEnergyOn} />
+                <Label htmlFor="energy" className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Zap className="w-3 h-3 text-cyan" /> Energy
+                </Label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Switch id="freeze" checked={frozen} onCheckedChange={setFrozen} />
+                <Label htmlFor="freeze" className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Snowflake className="w-3 h-3" /> Freeze
+                </Label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Switch id="cluster" checked={clusterMode} onCheckedChange={setClusterMode} />
+                <Label htmlFor="cluster" className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Layers className="w-3 h-3" /> Cluster
+                </Label>
+              </div>
+
+              <Button variant="outline" onClick={doSnapshot} className="border-cyan/40 gap-2">
+                <Camera className="w-4 h-4" />
+                Snapshot
+              </Button>
             </div>
 
-            <ForceGraph2D
-              ref={fgRef}
-              width={dimensions.width}
-              height={dimensions.height}
-              graphData={graphData}
-              backgroundColor="transparent"
-              nodeLabel={(n) => `${(n as ProfileNode).name}\n${(n as ProfileNode).group}`}
-              nodeCanvasObject={nodeCanvasObject}
-              linkDirectionalParticles={3}
-              linkDirectionalParticleWidth={2}
-              linkDirectionalParticleSpeed={() => Math.random() * 0.02 + 0.005}
-              linkColor={() => "rgba(0, 207, 255, 0.25)"}
-              enableNodeDrag
-              onNodeDragEnd={onNodeDragEnd}
-              onZoomEnd={() => {
-                saveCamera();
-                pulse(50);
-              }}
-              onEngineStop={saveCamera}
-            />
-          </>
-        )}
+            {/* readout */}
+            <div className="mt-2 w-full text-center text-[11px] text-cyan/80">
+              Zoom: {zoomK.toFixed(2)} {frozen ? "· Physics: OFF" : "· Physics: ON"} {clusterMode ? "· Clustered" : "· Free"}
+            </div>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
