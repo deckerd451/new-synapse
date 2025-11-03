@@ -10,7 +10,7 @@ export function LeaderboardTab() {
   const [connectors, setConnectors] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Fetch leaderboard data
+  // 🔹 Fetch leaderboard data
   useEffect(() => {
     fetchLeaderboard();
   }, [activeTab]);
@@ -40,6 +40,32 @@ export function LeaderboardTab() {
       setLoading(false);
     }
   };
+
+  // 🧠 Realtime: Listen for endorsement changes
+  useEffect(() => {
+    console.log("✅ Listening for realtime updates on endorsements...");
+    const channel = supabase
+      .channel("endorsements-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "endorsements",
+        },
+        (payload) => {
+          console.log("✨ New endorsement detected:", payload.new);
+          toast.success("New endorsement added!");
+          // Re-fetch leaderboard instantly
+          fetchLeaderboard();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   return (
     <div className="p-6 text-white">
@@ -99,7 +125,7 @@ export function LeaderboardTab() {
                       >
                         <td className="p-2 text-gray-500">{i + 1}</td>
                         <td className="p-2 capitalize">{s.skill}</td>
-                        <td className="p-2 text-right text-yellow-400">
+                        <td className="p-2 text-right text-yellow-400 animate-fade-in">
                           {s.endorsement_count}
                         </td>
                       </tr>
@@ -134,7 +160,7 @@ export function LeaderboardTab() {
                       >
                         <td className="p-2 text-gray-500">{i + 1}</td>
                         <td className="p-2 capitalize">{c.user_name}</td>
-                        <td className="p-2 text-right text-cyan-400">
+                        <td className="p-2 text-right text-cyan-400 animate-fade-in">
                           {c.total_given}
                         </td>
                       </tr>
