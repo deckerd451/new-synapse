@@ -87,12 +87,12 @@ export function ProfileTab() {
         email: profile.email || user?.email || "",
       };
 
-      const { data: updatedProfile, error } = await supabase
-        .from("community")
-        .update(updates)
-        .eq("id", profile.id)
-        .select()
-        .single();
+     const { data: updatedProfile, error } = await supabase
+  .from("community")
+  .update(updates)
+  .eq("id", profile.id)
+  .select("id, name, email, bio, skills, image_url, user_id, updated_at")
+  .single();
 
       if (error) throw error;
       setProfile(updatedProfile);
