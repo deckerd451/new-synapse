@@ -37,9 +37,6 @@ export function HomePage() {
       ) : (
         <Login />
       )}
-      <footer className="text-center py-4 text-sm text-muted-foreground">
-        Built with ❤️ at Cloudflare
-      </footer>
     </div>
   );
 }
