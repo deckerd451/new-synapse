@@ -1,245 +1,323 @@
-/* -----------------------------------------------------------
-   Fonts & Tailwind
------------------------------------------------------------ */
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=JetBrains+Mono&display=swap');
+import { useState, useEffect, useRef, useCallback } from "react";
+import ForceGraph2D, { NodeObject, LinkObject } from "react-force-graph-2d";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Zap,
+  RotateCcw,
+  Maximize2,
+  Minimize2,
+  Loader2,
+  ServerCrash,
+} from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import { useTheme } from "@/hooks/use-theme";
+import { toast } from "sonner";
+import { RealtimeChannel } from "@supabase/supabase-js";
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* -----------------------------------------------------------
-   Design Tokens (CSS Variables)
-   - Light/Dark HSL tokens aligned to Tailwind semantic colors
-   - Accent = Cyan, Primary = Gold
------------------------------------------------------------ */
-@layer base {
-  :root {
-    /* Surfaces */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 4%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 4%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 4%;
-
-    /* Brand */
-    --primary: 51 100% 50%;  /* Gold */
-    --primary-foreground: 240 10% 6%;
-    --accent: 195 100% 50%;  /* Cyan */
-    --accent-foreground: 240 10% 6%;
-
-    /* UI */
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 95%;
-    --muted-foreground: 0 0% 45%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 51 100% 50%;
-    --radius: 0.5rem;
-
-    /* Convenience aliases */
-    --gold: 51 100% 50%;
-    --cyan: 195 100% 50%;
-  }
-
-  .dark {
-    --background: 240 10% 4%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 5%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 5%;
-    --popover-foreground: 0 0% 98%;
-
-    --primary: 51 100% 50%;
-    --primary-foreground: 240 10% 4%;
-    --accent: 195 100% 50%;
-    --accent-foreground: 240 10% 4%;
-
-    --secondary: 240 4% 16%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 4% 16%;
-    --muted-foreground: 0 0% 64%;
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 4% 16%;
-    --input: 240 4% 16%;
-    --ring: 51 100% 50%;
-
-    --gold: 51 100% 50%;
-    --cyan: 195 100% 50%;
-  }
-
-  * { @apply border-border; }
-
-  html {
-    scroll-behavior: smooth;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-
-  body {
-    @apply bg-background text-foreground;
-    font-family: 'Sora', system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
-    font-feature-settings: 'cv02','cv03','cv04','cv11';
-    text-rendering: optimizeLegibility;
-  }
-
-  /* Monospace helper for technical UI chrome */
-  code, kbd, samp, .font-mono {
-    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  }
+interface ProfileNode extends NodeObject {
+  id: string;
+  name: string;
+  imageUrl?: string;
+  color: string;
+  group: string;
 }
 
-/* -----------------------------------------------------------
-   Technical HUD / Controls
------------------------------------------------------------ */
-@layer components {
-  .hud-btn {
-    --tw-ring-color: color-mix(in oklab, rgba(0,255,255,0.6) 60%, transparent);
-    border-color: rgba(0, 255, 255, 0.35) !important;
-    background: rgba(8, 12, 16, 0.60);
-    backdrop-filter: saturate(120%) blur(6px);
-    transition: background 160ms ease, transform 120ms ease, box-shadow 160ms ease;
-  }
-  .hud-btn:hover {
-    background: rgba(12, 20, 26, 0.78);
-    box-shadow: 0 0 0 1px rgba(0,255,255,0.25), 0 0 16px rgba(0,255,255,0.12) inset;
-  }
-  .hud-btn:active { transform: translateY(1px); }
-  .hud-btn:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(0,255,255,0.55);
-  }
+export function SynapseTab() {
+  const { isDark } = useTheme();
+  const fgRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  .control-dock {
-    @apply fixed bottom-3 left-1/2 -translate-x-1/2 z-50;
-    display: flex; gap: 0.75rem;
-  }
+  const [graphData, setGraphData] = useState<{ nodes: ProfileNode[]; links: LinkObject[] }>({
+    nodes: [],
+    links: [],
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [savedView, setSavedView] = useState<any>(null);
+  const [isFull, setIsFull] = useState(false);
+  const [activeBursts, setActiveBursts] = useState<Set<string>>(new Set());
 
-  .glass {
-    background: color-mix(in oklab, rgba(8,12,16,0.7) 85%, transparent);
-    backdrop-filter: blur(8px) saturate(120%);
-    border: 1px solid rgba(0,255,255,0.15);
-    box-shadow: 0 0 40px rgba(0, 255, 255, 0.05) inset;
-  }
+  const skillColors = ["#FFD700", "#00FFFF", "#FF69B4", "#ADFF2F", "#FFA500", "#9370DB"];
+  const getColorByGroup = (group: string) => {
+    const idx =
+      Math.abs(group.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)) %
+      skillColors.length;
+    return skillColors[idx];
+  };
 
-  .panel {
-    @apply rounded-lg p-4;
-    border: 1px solid rgba(0,255,255,0.22);
-    background: linear-gradient(
-      180deg,
-      rgba(0, 18, 24, 0.78),
-      rgba(0, 10, 14, 0.70)
-    );
-    color: hsl(var(--accent));
-  }
+  // 🧠 Fetch initial graph
+  useEffect(() => {
+    const fetchGraphData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data: profiles, error: profilesError } = await supabase
+          .from("community")
+          .select("id, name, image_url, skills");
+        if (profilesError) throw profilesError;
 
-  .kbd {
-    @apply px-1.5 py-0.5 rounded border;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 0.75rem;
-    line-height: 1rem;
-    border-color: rgba(0, 255, 255, 0.25);
-    background: rgba(0, 20, 24, 0.5);
-    color: hsl(var(--accent));
-  }
-}
+        const { data: connections, error: connectionsError } = await supabase
+          .from("connections")
+          .select("id, from_user_id, to_user_id");
+        if (connectionsError) throw connectionsError;
 
-/* -----------------------------------------------------------
-   Canvas & Rendering
------------------------------------------------------------ */
-canvas {
-  image-rendering: optimizeQuality;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+        const nodes: ProfileNode[] =
+          profiles?.map((p, i) => {
+            let group = "General";
+            if (p.skills) {
+              try {
+                const arr =
+                  typeof p.skills === "string"
+                    ? p.skills.split(",").map((s) => s.trim())
+                    : Array.isArray(p.skills)
+                    ? p.skills
+                    : [];
+                if (arr.length > 0) group = arr[0];
+              } catch {
+                group = "General";
+              }
+            }
+            const color = getColorByGroup(group);
+            const angle = (i / profiles.length) * 2 * Math.PI;
+            const radius = 300;
+            const cx = Math.cos(angle) * radius;
+            const cy = Math.sin(angle) * radius;
 
-/* -----------------------------------------------------------
-   Architectural Grid Background
-   - Subtle animated cyan drafting grid with inner glow ring
------------------------------------------------------------ */
-.synapse-bg {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(to right, rgba(0, 255, 255, 0.06) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 255, 255, 0.06) 1px, transparent 1px);
-  background-size: 60px 60px;
-  z-index: 0;
-  pointer-events: none;
-  animation: gridPulse 12s linear infinite;
-}
-.synapse-bg::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border: 1px solid rgba(0, 255, 255, 0.14);
-  box-shadow: 0 0 40px rgba(0, 255, 255, 0.05) inset;
-  pointer-events: none;
-  border-radius: 8px;
-}
+            return {
+              id: p.id,
+              name: p.name || "Unnamed",
+              imageUrl: p.image_url || undefined,
+              color,
+              group,
+              x: cx,
+              y: cy,
+            };
+          }) || [];
 
-@keyframes gridPulse {
-  0%   { opacity: 0.55; filter: hue-rotate(0deg) brightness(1); }
-  50%  { opacity: 0.90; filter: hue-rotate(35deg) brightness(1.15); }
-  100% { opacity: 0.55; filter: hue-rotate(0deg) brightness(1); }
-}
+        const links: LinkObject[] =
+          connections?.map((c) => ({
+            source: c.from_user_id,
+            target: c.to_user_id,
+          })) || [];
 
-/* -----------------------------------------------------------
-   Micro-interactions & Motion
------------------------------------------------------------ */
-@keyframes fade-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.animate-fade-in { animation: fade-in 0.28s ease-out both; }
+        setGraphData({ nodes, links });
+      } catch (err: any) {
+        console.error("Graph fetch error:", err);
+        setError(err.message || "Failed to load network data.");
+        toast.error(err.message || "Failed to load network data.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchGraphData();
+  }, []);
 
-@keyframes glow-ping {
-  0%   { box-shadow: 0 0 0 0 rgba(0,255,255,0.35); }
-  70%  { box-shadow: 0 0 0 8px rgba(0,255,255,0); }
-  100% { box-shadow: 0 0 0 0 rgba(0,255,255,0); }
-}
-.glow-ping { animation: glow-ping 1.6s cubic-bezier(.2,.8,.2,1) infinite; }
+  // 🛰️ Supabase Realtime listener for new connections
+  useEffect(() => {
+    const channel: RealtimeChannel = supabase
+      .channel("realtime-connections")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "connections" },
+        (payload) => {
+          const newLink = payload.new;
+          if (!newLink) return;
+          const linkId = `${newLink.from_user_id}-${newLink.to_user_id}`;
+          console.log("⚡ New connection detected:", linkId);
 
-/* Prefer reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  .animate-fade-in,
-  .glow-ping,
-  .synapse-bg { animation: none !important; }
-}
+          // Add to active bursts for 3s glow
+          setActiveBursts((prev) => new Set(prev).add(linkId));
+          setTimeout(() => {
+            setActiveBursts((prev) => {
+              const copy = new Set(prev);
+              copy.delete(linkId);
+              return copy;
+            });
+          }, 3000);
 
-/* -----------------------------------------------------------
-   Utility Touch-ups for Technical UI
------------------------------------------------------------ */
-.hr-thin {
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    rgba(0,255,255,0) 0%,
-    rgba(0,255,255,0.35) 15%,
-    rgba(0,255,255,0.35) 85%,
-    rgba(0,255,255,0) 100%
+          // Optionally append link dynamically
+          setGraphData((prev) => ({
+            ...prev,
+            links: [
+              ...prev.links,
+              { source: newLink.from_user_id, target: newLink.to_user_id },
+            ],
+          }));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // 📏 Responsive sizing
+  useEffect(() => {
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        setDimensions({
+          width: containerRef.current.offsetWidth,
+          height: containerRef.current.offsetHeight,
+        });
+      }
+    };
+    updateDimensions();
+    window.addEventListener("resize", updateDimensions);
+    return () => window.removeEventListener("resize", updateDimensions);
+  }, []);
+
+  // 🎨 Node Rendering — glowing technical style
+  const nodeCanvasObject = useCallback(
+    (node: NodeObject, ctx: CanvasRenderingContext2D, globalScale: number) => {
+      const n = node as ProfileNode;
+      const r = 5;
+      const gradient = ctx.createRadialGradient(n.x!, n.y!, 0, n.x!, n.y!, 20);
+      gradient.addColorStop(0, `${n.color}AA`);
+      gradient.addColorStop(1, "transparent");
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(n.x!, n.y!, 20, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Core
+      ctx.beginPath();
+      ctx.arc(n.x!, n.y!, r, 0, 2 * Math.PI);
+      ctx.fillStyle = n.color;
+      ctx.fill();
+
+      // Label
+      const fontSize = 11 / globalScale;
+      ctx.font = `${fontSize}px JetBrains Mono`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = isDark ? "#E0E0E0" : "#222";
+      ctx.fillText(n.name, n.x!, n.y! + 8 / globalScale);
+    },
+    [isDark]
   );
-}
 
-.badge-cyan {
-  border: 1px solid rgba(0,255,255,0.28);
-  background: rgba(0, 30, 36, 0.45);
-  color: hsl(var(--accent));
-  padding: 0.15rem 0.5rem;
-  border-radius: 0.375rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.02em;
-}
+  // ⚡ Link visual dynamics
+  const linkColor = (link: LinkObject) => {
+    const id = `${link.source}-${link.target}`;
+    return activeBursts.has(id)
+      ? "rgba(0,255,255,0.9)"
+      : "rgba(0,255,255,0.25)";
+  };
 
-/* Tooltip shell (for future technical overlays) */
-.tooltip {
-  @apply rounded px-2 py-1 text-xs;
-  border: 1px solid rgba(0,255,255,0.25);
-  background: rgba(0,20,24,0.85);
-  color: hsl(var(--accent));
-  backdrop-filter: blur(6px) saturate(120%);
+  const linkDirectionalParticles = (link: LinkObject) =>
+    activeBursts.has(`${link.source}-${link.target}`) ? 12 : 3;
+
+  const linkDirectionalParticleWidth = (link: LinkObject) =>
+    activeBursts.has(`${link.source}-${link.target}`) ? 3 : 1.5;
+
+  const linkDirectionalParticleSpeed = (link: LinkObject) =>
+    activeBursts.has(`${link.source}-${link.target}`)
+      ? Math.random() * 0.02 + 0.015
+      : Math.random() * 0.008 + 0.004;
+
+  // 🎥 Camera controls
+  const saveCameraView = () => {
+    if (!fgRef.current) return;
+    const { x, y, k } = fgRef.current.zoom();
+    localStorage.setItem("synapse_view", JSON.stringify({ x, y, k }));
+    setSavedView({ x, y, k });
+    toast.success("View saved");
+  };
+
+  const loadCameraView = () => {
+    const stored = localStorage.getItem("synapse_view");
+    if (stored && fgRef.current) {
+      const { x, y, k } = JSON.parse(stored);
+      fgRef.current.zoom(k, { x, y }, 800);
+    }
+  };
+
+  const resetCamera = () => {
+    fgRef.current.zoomToFit(400, 60);
+  };
+
+  // 🖥️ Fullscreen toggle
+  const toggleFullscreen = () => {
+    setIsFull((prev) => !prev);
+    setTimeout(() => {
+      if (containerRef.current) {
+        setDimensions({
+          width: containerRef.current.offsetWidth,
+          height: containerRef.current.offsetHeight,
+        });
+      }
+    }, 400);
+  };
+
+  return (
+    <Card
+      className={`border-cyan/20 bg-background/50 ${
+        isFull ? "fixed inset-0 z-50 rounded-none" : "h-[70vh]"
+      } flex flex-col`}
+    >
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-cyan">
+          <Zap /> Synapse View —{" "}
+          <span className="text-sm text-muted-foreground">Technical Energy Network</span>
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent ref={containerRef} className="relative flex-grow overflow-hidden">
+        <div className="synapse-bg" />
+
+        {loading && (
+          <div className="absolute inset-0 flex flex-col justify-center items-center bg-background/50">
+            <Loader2 className="h-8 w-8 text-cyan animate-spin" />
+            <p className="mt-4 text-muted-foreground">Building network visualization...</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="absolute inset-0 flex flex-col justify-center items-center bg-destructive/10 rounded-lg">
+            <ServerCrash className="h-8 w-8 text-destructive mx-auto mb-2" />
+            <p className="text-destructive-foreground font-semibold">Network Error</p>
+            <p className="text-sm text-muted-foreground">{error}</p>
+          </div>
+        )}
+
+        {!loading && !error && (
+          <ForceGraph2D
+            ref={fgRef}
+            width={dimensions.width}
+            height={dimensions.height}
+            graphData={graphData}
+            nodeLabel={(n) => `${(n as ProfileNode).name} — ${(n as ProfileNode).group}`}
+            nodeCanvasObject={nodeCanvasObject}
+            linkColor={linkColor}
+            linkDirectionalParticles={linkDirectionalParticles}
+            linkDirectionalParticleWidth={linkDirectionalParticleWidth}
+            linkDirectionalParticleSpeed={linkDirectionalParticleSpeed}
+            backgroundColor="transparent"
+          />
+        )}
+
+        {/* HUD Controls */}
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-3 z-50">
+          <button onClick={resetCamera} className="hud-btn px-3 py-2 rounded text-cyan text-sm flex items-center gap-1">
+            <RotateCcw className="w-4 h-4" /> Reset
+          </button>
+          <button onClick={saveCameraView} className="hud-btn px-3 py-2 rounded text-cyan text-sm flex items-center gap-1">
+            Save
+          </button>
+          <button onClick={loadCameraView} className="hud-btn px-3 py-2 rounded text-cyan text-sm flex items-center gap-1">
+            Load
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            className="hud-btn px-3 py-2 rounded text-cyan text-sm flex items-center gap-1"
+          >
+            {isFull ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}{" "}
+            {isFull ? "Exit" : "Full"}
+          </button>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
