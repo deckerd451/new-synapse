@@ -256,9 +256,10 @@ const handleConnect = async (target: any) => {
                 </CardHeader>
                 <CardContent>
                   {renderSkills(person)}
-                  <p className="text-gray-500 text-sm mt-3">
-                    {person.interests || 'No bio available.'}
-                  </p>
+                 <p className="text-gray-500 text-sm mt-3">
+  {person.bio?.trim() || 'No bio available.'}
+</p>
+
                   {status === 'none' ? (
                     <Button
                       className="bg-blue-500 hover:bg-blue-600 w-full mt-4"
