@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Upload, Check, X } from "lucide-react";
 import { supabase, ensureCommunityUser } from "@/lib/supabaseClient";
+import { useNavigate } from "react-router-dom"; // ✅ NEW: for redirect
 
 // 🧩 Schema
 const profileSchema = z.object({
@@ -36,6 +37,7 @@ export function ProfileTab() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const navigate = useNavigate(); // ✅ NEW: navigation hook
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -68,45 +70,65 @@ export function ProfileTab() {
       .join(", ");
   };
 
- // 🧭 Handle form submit
-const onSubmit = async (data: ProfileFormValues) => {
-  if (!profile) return;
-  setLoading(true);
+  // 🧭 Handle form submit
+  const onSubmit = async (data: ProfileFormValues) => {
+    if (!profile) return;
+    setLoading(true);
 
-  try {
-    await ensureCommunityUser();
-    const { data: authData } = await supabase.auth.getUser();
-    const user = authData?.user;
+    try {
+      await ensureCommunityUser();
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
 
-    const updates = {
-      name: data.name,
-      // ✅ Safely normalize the bio — prevents nulls or extra spaces
-      bio: typeof data.bio === "string" ? data.bio.trim() : "",
-      // ✅ Clean up skills list
-      skills: cleanSkills(data.skills),
-      updated_at: new Date().toISOString(),
-      user_id: user?.id || profile.user_id,
-      email: profile.email || user?.email || "",
-    };
+      const updates = {
+        name: data.name,
+        bio: typeof data.bio === "string" ? data.bio.trim() : "",
+        skills: cleanSkills(data.skills),
+        updated_at: new Date().toISOString(),
+        user_id: user?.id || profile.user_id,
+        email: profile.email || user?.email || "",
+      };
 
-    const { data: updatedProfile, error } = await supabase
-      .from("community")
-      .update(updates)
-      .eq("id", profile.id)
-      .select("id, name, email, bio, skills, image_url, user_id, updated_at")
-      .single();
+      const { data: updatedProfile, error } = await supabase
+        .from("community")
+        .update(updates)
+        .eq("id", profile.id)
+        .select(
+          "id, name, email, bio, skills, image_url, user_id, updated_at, profile_completed"
+        )
+        .single();
 
-    if (error) throw error;
-    setProfile(updatedProfile);
-    toast.success("✅ Profile updated successfully!");
-  } catch (err: any) {
-    console.error("Error updating profile:", err);
-    toast.error(err.message || "Failed to update profile.");
-  } finally {
-    setLoading(false);
-  }
-};
+      if (error) throw error;
+      setProfile(updatedProfile);
+      toast.success("✅ Profile updated successfully!");
 
+      // ✅ NEW: Mark profile as completed if key fields are filled
+      const nowComplete =
+        (updates.name && updates.name.trim().length > 1) &&
+        (updates.skills && updates.skills.trim().length > 0);
+
+      if (nowComplete) {
+        await supabase
+          .from("community")
+          .update({
+            profile_completed: true,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", profile.id);
+
+        // ✅ Redirect only if this is first time completing profile
+        if (!profile.profile_completed) {
+          toast.success("🎉 Profile complete! Redirecting you to the network...");
+          setTimeout(() => navigate("/network"), 1500);
+        }
+      }
+    } catch (err: any) {
+      console.error("Error updating profile:", err);
+      toast.error(err.message || "Failed to update profile.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 🖼️ Crop image to square
   const cropToSquare = (file: File): Promise<Blob> =>
