@@ -1,15 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import ForceGraph2D, { NodeObject, LinkObject } from "react-force-graph-2d";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Zap,
-  RotateCcw,
-  Maximize2,
-  Minimize2,
-  Loader2,
-  ServerCrash,
-  XCircle,
-} from "lucide-react";
+import { Zap, Loader2, ServerCrash } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useTheme } from "@/hooks/use-theme";
 import { toast } from "sonner";
@@ -17,78 +9,57 @@ import { toast } from "sonner";
 interface ProfileNode extends NodeObject {
   id: string;
   name: string;
+  group?: string;
+  color?: string;
   imageUrl?: string;
-  color: string;
-  group: string;
-  skills?: string[];
+}
+
+interface NodeMetrics {
+  connections: number;
+  endorsements: number;
+  bio?: string;
 }
 
 export function SynapseTab() {
   const { isDark } = useTheme();
   const fgRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [graphData, setGraphData] = useState<{ nodes: ProfileNode[]; links: LinkObject[] }>({
-    nodes: [],
-    links: [],
-  });
-  const [selectedNode, setSelectedNode] = useState<ProfileNode | null>(null);
+  const [graphData, setGraphData] = useState<{ nodes: ProfileNode[]; links: LinkObject[] }>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [isFull, setIsFull] = useState(false);
 
-  const skillColors = ["#FFD700", "#00FFFF", "#FF69B4", "#ADFF2F", "#FFA500", "#9370DB"];
-  const getColorByGroup = (group: string) => {
-    const idx =
-      Math.abs(group.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)) %
-      skillColors.length;
-    return skillColors[idx];
-  };
+  const [hoveredNode, setHoveredNode] = useState<ProfileNode | null>(null);
+  const [tooltip, setTooltip] = useState({ x: 0, y: 0, visible: false });
+  const [metricsCache, setMetricsCache] = useState<Record<string, NodeMetrics>>({});
 
-  // 🧠 Load graph data
+  // 🧠 Fetch network data
   useEffect(() => {
     const fetchGraphData = async () => {
       setLoading(true);
-      setError(null);
       try {
-        const { data: profiles, error: profilesError } = await supabase
-          .from("community")
-          .select("id, name, image_url, skills");
-        if (profilesError) throw profilesError;
+        const { data: profiles } = await supabase.from("community").select("id, name, image_url, skills");
+        const { data: connections } = await supabase.from("connections").select("id, from_user_id, to_user_id");
 
-        const { data: connections, error: connectionsError } = await supabase
-          .from("connections")
-          .select("id, from_user_id, to_user_id");
-        if (connectionsError) throw connectionsError;
+        const nodes =
+          profiles?.map((p) => ({
+            id: p.id,
+            name: p.name || "Unnamed",
+            group: Array.isArray(p.skills) ? p.skills[0] : "General",
+            color: "#00FFFF",
+            imageUrl: p.image_url || undefined,
+          })) || [];
 
-        const nodes: ProfileNode[] =
-          profiles?.map((p, i) => {
-            const group = Array.isArray(p.skills)
-              ? p.skills[0] || "General"
-              : typeof p.skills === "string"
-              ? p.skills.split(",")[0] || "General"
-              : "General";
-            const color = getColorByGroup(group);
-            return {
-              id: p.id,
-              name: p.name || "Unnamed",
-              imageUrl: p.image_url || undefined,
-              color,
-              group,
-            };
-          }) || [];
-
-        const links: LinkObject[] =
+        const links =
           connections?.map((c) => ({
             source: c.from_user_id,
             target: c.to_user_id,
           })) || [];
 
         setGraphData({ nodes, links });
-      } catch (err: any) {
-        console.error("Graph fetch error:", err);
-        setError(err.message || "Failed to load network data.");
-        toast.error(err.message || "Failed to load network data.");
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to load network data.");
       } finally {
         setLoading(false);
       }
@@ -96,9 +67,9 @@ export function SynapseTab() {
     fetchGraphData();
   }, []);
 
-  // 📏 Handle sizing
+  // 📏 Resize handling
   useEffect(() => {
-    const updateDimensions = () => {
+    const update = () => {
       if (containerRef.current) {
         setDimensions({
           width: containerRef.current.offsetWidth,
@@ -106,31 +77,72 @@ export function SynapseTab() {
         });
       }
     };
-    updateDimensions();
-    window.addEventListener("resize", updateDimensions);
-    return () => window.removeEventListener("resize", updateDimensions);
-  }, [loading]);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
-  // 🧬 Node Rendering
+  // 🧭 Track mouse
+  useEffect(() => {
+    const handleMove = (e: MouseEvent) => {
+      setTooltip((t) => ({ ...t, x: e.clientX + 12, y: e.clientY + 12 }));
+    };
+    window.addEventListener("mousemove", handleMove);
+    return () => window.removeEventListener("mousemove", handleMove);
+  }, []);
+
+  // 🔍 Fetch node metrics dynamically
+  const fetchNodeMetrics = useCallback(async (nodeId: string) => {
+    if (metricsCache[nodeId]) return metricsCache[nodeId];
+
+    try {
+      const [{ count: connCount }, { count: endCount }, { data: profileData }] = await Promise.all([
+        supabase
+          .from("connections")
+          .select("*", { count: "exact", head: true })
+          .or(`from_user_id.eq.${nodeId},to_user_id.eq.${nodeId}`),
+        supabase
+          .from("endorsements")
+          .select("*", { count: "exact", head: true })
+          .eq("target_id", nodeId),
+        supabase
+          .from("community")
+          .select("bio")
+          .eq("id", nodeId)
+          .maybeSingle(),
+      ]);
+
+      const metrics = {
+        connections: connCount || 0,
+        endorsements: endCount || 0,
+        bio: profileData?.bio,
+      };
+      setMetricsCache((prev) => ({ ...prev, [nodeId]: metrics }));
+      return metrics;
+    } catch (err) {
+      console.error("Metrics fetch error:", err);
+      return { connections: 0, endorsements: 0 };
+    }
+  }, [metricsCache]);
+
+  // 🧬 Node render
   const nodeCanvasObject = useCallback(
     (node: NodeObject, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const n = node as ProfileNode;
       const r = 5;
       const gradient = ctx.createRadialGradient(n.x!, n.y!, 0, n.x!, n.y!, 18);
-      gradient.addColorStop(0, `${n.color}AA`);
+      gradient.addColorStop(0, `${n.color || "#00FFFF"}AA`);
       gradient.addColorStop(1, "transparent");
       ctx.fillStyle = gradient;
       ctx.beginPath();
       ctx.arc(n.x!, n.y!, 18, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Core
       ctx.beginPath();
       ctx.arc(n.x!, n.y!, r, 0, 2 * Math.PI);
-      ctx.fillStyle = n.color;
+      ctx.fillStyle = n.color || "#00FFFF";
       ctx.fill();
 
-      // Label
       const fontSize = 11 / globalScale;
       ctx.font = `${fontSize}px JetBrains Mono`;
       ctx.textAlign = "center";
@@ -141,46 +153,27 @@ export function SynapseTab() {
     [isDark]
   );
 
-  // 🎛️ Controls
-  const resetCamera = () => fgRef.current?.zoomToFit(400, 60);
-  const toggleFullscreen = () => setIsFull((p) => !p);
-
   return (
-    <Card
-      className={`border-cyan/20 bg-background/50 ${
-        isFull ? "fixed inset-0 z-50 rounded-none" : "h-[70vh]"
-      } flex flex-col`}
-    >
+    <Card className="border-cyan/20 bg-background/50 h-[70vh] flex flex-col">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-cyan">
-          <Zap /> Synapse Network —{" "}
-          <span className="text-sm text-muted-foreground">Architectural Diagnostics</span>
+          <Zap /> Synapse Network — <span className="text-sm text-muted-foreground">Real-Time Data Probe</span>
         </CardTitle>
       </CardHeader>
 
       <CardContent ref={containerRef} className="relative flex-grow overflow-hidden">
-        {/* Subtle technical grid background */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              "linear-gradient(0deg, rgba(0,255,255,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,255,0.4) 1px, transparent 1px)",
-            backgroundSize: "40px 40px",
-          }}
-        />
+        <div className="synapse-bg" />
 
         {loading && (
-          <div className="absolute inset-0 flex flex-col justify-center items-center bg-background/50">
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
             <Loader2 className="h-8 w-8 text-cyan animate-spin" />
-            <p className="mt-4 text-muted-foreground">Building network visualization...</p>
+            <p className="text-muted-foreground mt-2">Analyzing network topology…</p>
           </div>
         )}
 
         {error && (
-          <div className="absolute inset-0 flex flex-col justify-center items-center bg-destructive/10 rounded-lg">
-            <ServerCrash className="h-8 w-8 text-destructive mx-auto mb-2" />
-            <p className="text-destructive-foreground font-semibold">Network Error</p>
-            <p className="text-sm text-muted-foreground">{error}</p>
+          <div className="absolute inset-0 flex items-center justify-center text-destructive">
+            <ServerCrash className="h-6 w-6 mr-2" /> {error}
           </div>
         )}
 
@@ -190,58 +183,49 @@ export function SynapseTab() {
             width={dimensions.width}
             height={dimensions.height}
             graphData={graphData}
-            nodeLabel={(n) => `${(n as ProfileNode).name} — ${(n as ProfileNode).group}`}
             nodeCanvasObject={nodeCanvasObject}
             linkColor={() => "rgba(0,255,255,0.25)"}
             linkDirectionalParticles={3}
             linkDirectionalParticleWidth={1.5}
             linkDirectionalParticleSpeed={() => Math.random() * 0.008 + 0.004}
             backgroundColor="transparent"
-            onNodeClick={(node) => setSelectedNode(node as ProfileNode)}
+            onNodeHover={async (node) => {
+              if (node) {
+                const n = node as ProfileNode;
+                const data = await fetchNodeMetrics(n.id);
+                setHoveredNode({ ...n, ...data });
+                setTooltip((t) => ({ ...t, visible: true }));
+              } else {
+                setTooltip((t) => ({ ...t, visible: false }));
+                setHoveredNode(null);
+              }
+            }}
           />
         )}
 
-        {/* HUD controls */}
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-3 z-50">
-          <button
-            onClick={resetCamera}
-            className="hud-btn px-3 py-2 rounded text-cyan text-sm flex items-center gap-1"
+        {/* 🧠 Data Probe Tooltip */}
+        {tooltip.visible && hoveredNode && (
+          <div
+            className="tooltip animate-fade-in"
+            style={{
+              position: "fixed",
+              top: tooltip.y,
+              left: tooltip.x,
+              transform: "translate(10px, 10px)",
+              zIndex: 1000,
+            }}
           >
-            <RotateCcw className="w-4 h-4" /> Reset
-          </button>
-          <button
-            onClick={toggleFullscreen}
-            className="hud-btn px-3 py-2 rounded text-cyan text-sm flex items-center gap-1"
-          >
-            {isFull ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-            {isFull ? "Exit" : "Full"}
-          </button>
-        </div>
-
-        {/* ⚙️ Node Info HUD */}
-        {selectedNode && (
-          <div className="absolute bottom-6 right-6 w-64 bg-black/70 border border-cyan/40 rounded-lg shadow-lg text-cyan p-4 backdrop-blur-sm animate-fade-in">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="font-mono text-base">{selectedNode.name}</h3>
-              <button onClick={() => setSelectedNode(null)} className="text-cyan/70 hover:text-cyan">
-                <XCircle size={16} />
-              </button>
-            </div>
-            {selectedNode.imageUrl && (
-              <img
-                src={selectedNode.imageUrl}
-                alt={selectedNode.name}
-                className="w-full h-32 object-cover rounded-md mb-2 border border-cyan/30"
-              />
+            <p className="font-mono text-xs text-cyan mb-1">{hoveredNode.name}</p>
+            <p className="text-[10px] text-cyan/70 leading-tight">
+              🧩 Connections: {metricsCache[hoveredNode.id]?.connections ?? "…"}
+              <br />
+              ⭐ Endorsements: {metricsCache[hoveredNode.id]?.endorsements ?? "…"}
+            </p>
+            {hoveredNode.bio && (
+              <p className="mt-1 text-[9px] text-cyan/60 max-w-[180px] italic line-clamp-2">
+                “{hoveredNode.bio.slice(0, 80)}…”
+              </p>
             )}
-            <p className="text-xs text-cyan/80">
-              <span className="uppercase tracking-wider text-cyan/60">Group: </span>
-              {selectedNode.group}
-            </p>
-            <p className="text-xs text-cyan/80 mt-1">
-              <span className="uppercase tracking-wider text-cyan/60">ID: </span>
-              {selectedNode.id.slice(0, 8)}…
-            </p>
           </div>
         )}
       </CardContent>
