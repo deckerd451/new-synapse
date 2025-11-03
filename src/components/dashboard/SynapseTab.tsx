@@ -1,10 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import ForceGraph2D, { NodeObject, LinkObject } from "react-force-graph-2d";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Zap, RotateCcw, Maximize2, Minimize2, ServerCrash, Loader2 } from "lucide-react";
+import {
+  Zap,
+  RotateCcw,
+  Maximize2,
+  Minimize2,
+  Loader2,
+  ServerCrash,
+} from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useTheme } from "@/hooks/use-theme";
 import { toast } from "sonner";
+import { RealtimeChannel } from "@supabase/supabase-js";
 
 interface ProfileNode extends NodeObject {
   id: string;
@@ -14,16 +22,11 @@ interface ProfileNode extends NodeObject {
   group: string;
 }
 
-interface Connection {
-  id: string;
-  from_user_id: string;
-  to_user_id: string;
-}
-
 export function SynapseTab() {
   const { isDark } = useTheme();
   const fgRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
   const [graphData, setGraphData] = useState<{ nodes: ProfileNode[]; links: LinkObject[] }>({
     nodes: [],
     links: [],
@@ -33,6 +36,7 @@ export function SynapseTab() {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [savedView, setSavedView] = useState<any>(null);
   const [isFull, setIsFull] = useState(false);
+  const [activeBursts, setActiveBursts] = useState<Set<string>>(new Set());
 
   const skillColors = ["#FFD700", "#00FFFF", "#FF69B4", "#ADFF2F", "#FFA500", "#9370DB"];
   const getColorByGroup = (group: string) => {
@@ -42,7 +46,7 @@ export function SynapseTab() {
     return skillColors[idx];
   };
 
-  // Fetch data from Supabase
+  // 🧠 Fetch initial graph
   useEffect(() => {
     const fetchGraphData = async () => {
       setLoading(true);
@@ -74,7 +78,6 @@ export function SynapseTab() {
                 group = "General";
               }
             }
-
             const color = getColorByGroup(group);
             const angle = (i / profiles.length) * 2 * Math.PI;
             const radius = 300;
@@ -107,11 +110,50 @@ export function SynapseTab() {
         setLoading(false);
       }
     };
-
     fetchGraphData();
   }, []);
 
-  // Responsive sizing
+  // 🛰️ Supabase Realtime listener for new connections
+  useEffect(() => {
+    const channel: RealtimeChannel = supabase
+      .channel("realtime-connections")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "connections" },
+        (payload) => {
+          const newLink = payload.new;
+          if (!newLink) return;
+          const linkId = `${newLink.from_user_id}-${newLink.to_user_id}`;
+          console.log("⚡ New connection detected:", linkId);
+
+          // Add to active bursts for 3s glow
+          setActiveBursts((prev) => new Set(prev).add(linkId));
+          setTimeout(() => {
+            setActiveBursts((prev) => {
+              const copy = new Set(prev);
+              copy.delete(linkId);
+              return copy;
+            });
+          }, 3000);
+
+          // Optionally append link dynamically
+          setGraphData((prev) => ({
+            ...prev,
+            links: [
+              ...prev.links,
+              { source: newLink.from_user_id, target: newLink.to_user_id },
+            ],
+          }));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // 📏 Responsive sizing
   useEffect(() => {
     const updateDimensions = () => {
       if (containerRef.current) {
@@ -126,27 +168,27 @@ export function SynapseTab() {
     return () => window.removeEventListener("resize", updateDimensions);
   }, []);
 
-  // Custom node rendering
+  // 🎨 Node Rendering — glowing technical style
   const nodeCanvasObject = useCallback(
     (node: NodeObject, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const n = node as ProfileNode;
       const r = 5;
-      const glow = ctx.createRadialGradient(n.x!, n.y!, 0, n.x!, n.y!, 12);
-      glow.addColorStop(0, n.color);
-      glow.addColorStop(1, "transparent");
-      ctx.fillStyle = glow;
+      const gradient = ctx.createRadialGradient(n.x!, n.y!, 0, n.x!, n.y!, 20);
+      gradient.addColorStop(0, `${n.color}AA`);
+      gradient.addColorStop(1, "transparent");
+      ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.arc(n.x!, n.y!, 12, 0, 2 * Math.PI);
+      ctx.arc(n.x!, n.y!, 20, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Solid node core
+      // Core
       ctx.beginPath();
       ctx.arc(n.x!, n.y!, r, 0, 2 * Math.PI);
       ctx.fillStyle = n.color;
       ctx.fill();
 
       // Label
-      const fontSize = 12 / globalScale;
+      const fontSize = 11 / globalScale;
       ctx.font = `${fontSize}px JetBrains Mono`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
@@ -156,12 +198,26 @@ export function SynapseTab() {
     [isDark]
   );
 
-  // Link color + energy pulse
-  const linkColor = () => "rgba(0, 255, 255, 0.3)";
-  const linkDirectionalParticleWidth = 2;
-  const linkDirectionalParticleSpeed = () => Math.random() * 0.008 + 0.005;
+  // ⚡ Link visual dynamics
+  const linkColor = (link: LinkObject) => {
+    const id = `${link.source}-${link.target}`;
+    return activeBursts.has(id)
+      ? "rgba(0,255,255,0.9)"
+      : "rgba(0,255,255,0.25)";
+  };
 
-  // Camera state management
+  const linkDirectionalParticles = (link: LinkObject) =>
+    activeBursts.has(`${link.source}-${link.target}`) ? 12 : 3;
+
+  const linkDirectionalParticleWidth = (link: LinkObject) =>
+    activeBursts.has(`${link.source}-${link.target}`) ? 3 : 1.5;
+
+  const linkDirectionalParticleSpeed = (link: LinkObject) =>
+    activeBursts.has(`${link.source}-${link.target}`)
+      ? Math.random() * 0.02 + 0.015
+      : Math.random() * 0.008 + 0.004;
+
+  // 🎥 Camera controls
   const saveCameraView = () => {
     if (!fgRef.current) return;
     const { x, y, k } = fgRef.current.zoom();
@@ -182,7 +238,7 @@ export function SynapseTab() {
     fgRef.current.zoomToFit(400, 60);
   };
 
-  // Toggle fullscreen
+  // 🖥️ Fullscreen toggle
   const toggleFullscreen = () => {
     setIsFull((prev) => !prev);
     setTimeout(() => {
@@ -203,12 +259,12 @@ export function SynapseTab() {
     >
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-cyan">
-          <Zap /> Synapse View — <span className="text-sm text-muted-foreground">Living Network</span>
+          <Zap /> Synapse View —{" "}
+          <span className="text-sm text-muted-foreground">Technical Energy Network</span>
         </CardTitle>
       </CardHeader>
 
       <CardContent ref={containerRef} className="relative flex-grow overflow-hidden">
-        {/* Technical grid background */}
         <div className="synapse-bg" />
 
         {loading && (
@@ -235,7 +291,7 @@ export function SynapseTab() {
             nodeLabel={(n) => `${(n as ProfileNode).name} — ${(n as ProfileNode).group}`}
             nodeCanvasObject={nodeCanvasObject}
             linkColor={linkColor}
-            linkDirectionalParticles={3}
+            linkDirectionalParticles={linkDirectionalParticles}
             linkDirectionalParticleWidth={linkDirectionalParticleWidth}
             linkDirectionalParticleSpeed={linkDirectionalParticleSpeed}
             backgroundColor="transparent"
