@@ -139,10 +139,11 @@ const handleEndorse = async (skill: string, target: any) => {
 
   try {
     const { error } = await supabase.from('endorsements').insert({
-      endorsed_by_user_id: user.id, // ✅ correct column name
-      endorsed_user_id: targetId,   // ✅ correct column name
-      skill,
-    });
+  endorsed_by_user_id: user.id,  // 👈 person giving the endorsement
+  endorsed_user_id: targetId,    // 👈 person being endorsed
+  skill,                         // 👈 name of the skill
+});
+
 
     if (error) {
       console.error('Endorsement insert failed:', error);
