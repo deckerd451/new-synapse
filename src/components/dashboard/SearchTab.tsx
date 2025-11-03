@@ -12,52 +12,50 @@ export function SearchTab() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Profile[]>([]);
   const [connections, setConnections] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  // 🧠 Get current user
-  const [user, setUser] = useState<any>(null);
+  // 🔑 Current user
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
   }, []);
 
-  // 🔍 Search by name or skills
+  // 🔍 Handle search
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) {
       toast.info('Please enter a search term');
       return;
     }
-    setLoading(true);
 
-    const column = searchType === 'name' ? 'name' : 'interests';
+    setLoading(true);
+    const column = searchType === 'name' ? 'name' : 'skills';
     const { data, error } = await supabase
       .from('community')
       .select('*')
       .ilike(column, `%${query}%`)
-      .limit(20);
+      .limit(24);
 
     if (error) toast.error(error.message);
     else setResults(data || []);
     setLoading(false);
   };
 
-  // 🧩 Load all existing connections for the user
+  // 🧠 Load all user connections
   const fetchConnections = async () => {
     if (!user) return;
     const { data, error } = await supabase
       .from('connections')
       .select('from_user_id, to_user_id, status')
       .or(`from_user_id.eq.${user.id},to_user_id.eq.${user.id}`);
-
-    if (error) console.error(error);
-    else setConnections(data || []);
+    if (!error && data) setConnections(data);
   };
 
   useEffect(() => {
     fetchConnections();
   }, [user]);
 
-  // ⚡ Create a connection
+  // ⚡ Create new connection
   const handleConnect = async (target: any) => {
     if (!user) {
       toast.error('Please log in first');
@@ -68,7 +66,7 @@ export function SearchTab() {
     const existing = connections.find(
       (c) =>
         (c.from_user_id === user.id && c.to_user_id === toId) ||
-        (c.from_user_id === toId && c.to_user_id === user.id)
+        (c.to_user_id === user.id && c.from_user_id === toId)
     );
 
     if (existing) {
@@ -90,7 +88,7 @@ export function SearchTab() {
     }
   };
 
-  // 🧩 Helper to get connection status
+  // 🧩 Helper: connection status
   const getConnectionStatus = (target: any) => {
     const toId = target.user_id || target.id;
     const match = connections.find(
@@ -101,10 +99,40 @@ export function SearchTab() {
     return match?.status || 'none';
   };
 
+  // 🎨 Helper: render skill chips
+  const renderSkills = (profile: any) => {
+    if (!profile.skills) return null;
+
+    let skillsArray: string[] = [];
+    if (typeof profile.skills === 'string') {
+      try {
+        // handle JSON-like or comma-separated formats
+        skillsArray = JSON.parse(profile.skills);
+      } catch {
+        skillsArray = profile.skills.split(',').map((s: string) => s.trim());
+      }
+    } else if (Array.isArray(profile.skills)) {
+      skillsArray = profile.skills;
+    }
+
+    return (
+      <div className="flex flex-wrap justify-center gap-2 mt-2">
+        {skillsArray.map((skill, i) => (
+          <span
+            key={i}
+            className="text-xs bg-blue-700/40 text-blue-200 px-2 py-1 rounded-full"
+          >
+            {skill}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="p-6 text-white">
       <div className="mb-6 flex flex-col items-center gap-4">
-        <h2 className="text-2xl font-bold text-blue-400">Find Connections</h2>
+        <h2 className="text-2xl font-bold text-yellow-400">Find Connections</h2>
         <form onSubmit={handleSearch} className="flex gap-3 w-full max-w-lg">
           <select
             className="bg-black border border-gray-600 rounded p-2 text-white"
@@ -126,50 +154,59 @@ export function SearchTab() {
         </form>
       </div>
 
+      {loading && (
+        <div className="flex justify-center items-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-cyan" />
+          <p className="ml-3 text-gray-400">Searching the network...</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {results.map((person) => {
-          const status = getConnectionStatus(person);
-          return (
-            <Card
-              key={person.id}
-              className="bg-[#111] border border-gray-700 text-center p-4"
-            >
-              <CardHeader>
-                <img
-                  src={person.image_url || '/images/default-avatar.png'}
-                  alt={person.name}
-                  className="w-20 h-20 rounded-full mx-auto mb-3 border border-yellow-400"
-                />
-                <CardTitle className="text-yellow-400">{person.name}</CardTitle>
-                <p className="text-gray-400 text-sm">{person.email}</p>
-              </CardHeader>
-              <CardContent>
-                <p className="mb-2 text-gray-500 text-sm">
-                  {person.interests || 'No bio available.'}
-                </p>
-                {status === 'none' ? (
-                  <Button
-                    className="bg-blue-500 hover:bg-blue-600 w-full"
-                    onClick={() => handleConnect(person)}
-                  >
-                    <i className="fa-solid fa-user-plus mr-2" /> Connect
-                  </Button>
-                ) : (
-                  <Button
-                    className={`w-full ${
-                      status === 'accepted'
-                        ? 'bg-green-600 hover:bg-green-700'
-                        : 'bg-yellow-600 hover:bg-yellow-700'
-                    }`}
-                    disabled
-                  >
-                    {status === 'accepted' ? 'Connected' : 'Pending'}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
+        {!loading &&
+          results.map((person) => {
+            const status = getConnectionStatus(person);
+            return (
+              <Card
+                key={person.id}
+                className="bg-[#111] border border-gray-700 text-center p-4"
+              >
+                <CardHeader>
+                  <img
+                    src={person.image_url || '/images/default-avatar.png'}
+                    alt={person.name}
+                    className="w-20 h-20 rounded-full mx-auto mb-3 border border-yellow-400"
+                  />
+                  <CardTitle className="text-yellow-400">{person.name}</CardTitle>
+                  <p className="text-gray-400 text-sm">{person.email}</p>
+                </CardHeader>
+                <CardContent>
+                  {renderSkills(person)}
+                  <p className="text-gray-500 text-sm mt-3">
+                    {person.interests || 'No bio available.'}
+                  </p>
+                  {status === 'none' ? (
+                    <Button
+                      className="bg-blue-500 hover:bg-blue-600 w-full mt-4"
+                      onClick={() => handleConnect(person)}
+                    >
+                      <i className="fa-solid fa-user-plus mr-2" /> Connect
+                    </Button>
+                  ) : (
+                    <Button
+                      className={`w-full mt-4 ${
+                        status === 'accepted'
+                          ? 'bg-green-600 hover:bg-green-700'
+                          : 'bg-yellow-600 hover:bg-yellow-700'
+                      }`}
+                      disabled
+                    >
+                      {status === 'accepted' ? 'Connected' : 'Pending'}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
       </div>
     </div>
   );
