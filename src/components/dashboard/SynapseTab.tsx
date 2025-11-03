@@ -1,300 +1,245 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import ForceGraph2D, { NodeObject, LinkObject } from "react-force-graph-2d";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Zap, Loader2, ServerCrash } from "lucide-react";
-import { supabase } from "@/lib/supabaseClient";
-import { useTheme } from "@/hooks/use-theme";
-import { toast } from "sonner";
+/* -----------------------------------------------------------
+   Fonts & Tailwind
+----------------------------------------------------------- */
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=JetBrains+Mono&display=swap');
 
-// =============== Types ===============
-interface ProfileNode extends NodeObject {
-  id: string;
-  name: string;
-  imageUrl?: string;
-  color: string;
-  group: string;   // cluster label (first skill)
-  // optional persisted positions (ForceGraph reads x/y; fx/fy pin)
-  x?: number; 
-  y?: number;
-  fx?: number;
-  fy?: number;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* -----------------------------------------------------------
+   Design Tokens (CSS Variables)
+   - Light/Dark HSL tokens aligned to Tailwind semantic colors
+   - Accent = Cyan, Primary = Gold
+----------------------------------------------------------- */
+@layer base {
+  :root {
+    /* Surfaces */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 4%;
+
+    /* Brand */
+    --primary: 51 100% 50%;  /* Gold */
+    --primary-foreground: 240 10% 6%;
+    --accent: 195 100% 50%;  /* Cyan */
+    --accent-foreground: 240 10% 6%;
+
+    /* UI */
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 95%;
+    --muted-foreground: 0 0% 45%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 51 100% 50%;
+    --radius: 0.5rem;
+
+    /* Convenience aliases */
+    --gold: 51 100% 50%;
+    --cyan: 195 100% 50%;
+  }
+
+  .dark {
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 5%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 5%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 51 100% 50%;
+    --primary-foreground: 240 10% 4%;
+    --accent: 195 100% 50%;
+    --accent-foreground: 240 10% 4%;
+
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 0 0% 64%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 51 100% 50%;
+
+    --gold: 51 100% 50%;
+    --cyan: 195 100% 50%;
+  }
+
+  * { @apply border-border; }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Sora', system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+    font-feature-settings: 'cv02','cv03','cv04','cv11';
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Monospace helper for technical UI chrome */
+  code, kbd, samp, .font-mono {
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
 }
 
-interface ConnectionRow {
-  id: string;
-  from_user_id: string;
-  to_user_id: string;
+/* -----------------------------------------------------------
+   Technical HUD / Controls
+----------------------------------------------------------- */
+@layer components {
+  .hud-btn {
+    --tw-ring-color: color-mix(in oklab, rgba(0,255,255,0.6) 60%, transparent);
+    border-color: rgba(0, 255, 255, 0.35) !important;
+    background: rgba(8, 12, 16, 0.60);
+    backdrop-filter: saturate(120%) blur(6px);
+    transition: background 160ms ease, transform 120ms ease, box-shadow 160ms ease;
+  }
+  .hud-btn:hover {
+    background: rgba(12, 20, 26, 0.78);
+    box-shadow: 0 0 0 1px rgba(0,255,255,0.25), 0 0 16px rgba(0,255,255,0.12) inset;
+  }
+  .hud-btn:active { transform: translateY(1px); }
+  .hud-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0,255,255,0.55);
+  }
+
+  .control-dock {
+    @apply fixed bottom-3 left-1/2 -translate-x-1/2 z-50;
+    display: flex; gap: 0.75rem;
+  }
+
+  .glass {
+    background: color-mix(in oklab, rgba(8,12,16,0.7) 85%, transparent);
+    backdrop-filter: blur(8px) saturate(120%);
+    border: 1px solid rgba(0,255,255,0.15);
+    box-shadow: 0 0 40px rgba(0, 255, 255, 0.05) inset;
+  }
+
+  .panel {
+    @apply rounded-lg p-4;
+    border: 1px solid rgba(0,255,255,0.22);
+    background: linear-gradient(
+      180deg,
+      rgba(0, 18, 24, 0.78),
+      rgba(0, 10, 14, 0.70)
+    );
+    color: hsl(var(--accent));
+  }
+
+  .kbd {
+    @apply px-1.5 py-0.5 rounded border;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    border-color: rgba(0, 255, 255, 0.25);
+    background: rgba(0, 20, 24, 0.5);
+    color: hsl(var(--accent));
+  }
 }
 
-interface CommunityRow {
-  id: string;
-  name: string | null;
-  image_url: string | null;
-  skills: string | string[] | null;
-  // Optional columns (if you added them in DB)
-  x?: number | null;
-  y?: number | null;
+/* -----------------------------------------------------------
+   Canvas & Rendering
+----------------------------------------------------------- */
+canvas {
+  image-rendering: optimizeQuality;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-// =============== Component ===============
-export function SynapseTab() {
-  const { isDark } = useTheme();
+/* -----------------------------------------------------------
+   Architectural Grid Background
+   - Subtle animated cyan drafting grid with inner glow ring
+----------------------------------------------------------- */
+.synapse-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to right, rgba(0, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 60px 60px;
+  z-index: 0;
+  pointer-events: none;
+  animation: gridPulse 12s linear infinite;
+}
+.synapse-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(0, 255, 255, 0.14);
+  box-shadow: 0 0 40px rgba(0, 255, 255, 0.05) inset;
+  pointer-events: none;
+  border-radius: 8px;
+}
 
-  const [graphData, setGraphData] = useState<{ nodes: ProfileNode[]; links: LinkObject[] }>({
-    nodes: [],
-    links: [],
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+@keyframes gridPulse {
+  0%   { opacity: 0.55; filter: hue-rotate(0deg) brightness(1); }
+  50%  { opacity: 0.90; filter: hue-rotate(35deg) brightness(1.15); }
+  100% { opacity: 0.55; filter: hue-rotate(0deg) brightness(1); }
+}
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+/* -----------------------------------------------------------
+   Micro-interactions & Motion
+----------------------------------------------------------- */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fade-in 0.28s ease-out both; }
 
-  const fgRef = useRef<any>(null); // ForceGraph ref
+@keyframes glow-ping {
+  0%   { box-shadow: 0 0 0 0 rgba(0,255,255,0.35); }
+  70%  { box-shadow: 0 0 0 8px rgba(0,255,255,0); }
+  100% { box-shadow: 0 0 0 0 rgba(0,255,255,0); }
+}
+.glow-ping { animation: glow-ping 1.6s cubic-bezier(.2,.8,.2,1) infinite; }
 
-  // --------- Color palette & grouping ----------
-  const skillColors = ["#FFD700", "#00FFFF", "#FF69B4", "#ADFF2F", "#FFA500", "#9370DB"];
+/* Prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .glow-ping,
+  .synapse-bg { animation: none !important; }
+}
 
-  const colorFor = (group: string) => {
-    const h = Math.abs(group.split("").reduce((a, c) => a + c.charCodeAt(0), 0));
-    return skillColors[h % skillColors.length];
-  };
-
-  const getFirstSkill = (skills: CommunityRow["skills"]) => {
-    if (!skills) return "General";
-    if (Array.isArray(skills)) return skills[0] || "General";
-    try {
-      // Try JSON first, then comma list
-      const maybe = JSON.parse(skills as string);
-      if (Array.isArray(maybe) && maybe.length) return String(maybe[0]);
-    } catch {
-      // fallback to comma-separated
-      const parts = String(skills)
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      if (parts.length) return parts[0];
-    }
-    return "General";
-  };
-
-  // --------- Data fetch ----------
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // profiles
-        const { data: profiles, error: profilesError } = await supabase
-          .from("community")
-          .select<CommunityRow>("id, name, image_url, skills, x, y");
-
-        if (profilesError) throw profilesError;
-
-        // connections
-        const { data: connections, error: connectionsError } = await supabase
-          .from("connections")
-          .select<ConnectionRow>("id, from_user_id, to_user_id");
-
-        if (connectionsError) throw connectionsError;
-
-        const count = profiles?.length || 1;
-
-        const nodes: ProfileNode[] =
-          profiles?.map((p, i) => {
-            const group = getFirstSkill(p.skills);
-            const color = colorFor(group);
-
-            // If DB already has x/y, use them. Otherwise give a clustered start.
-            let x: number | undefined = undefined;
-            let y: number | undefined = undefined;
-            if (typeof p.x === "number" && typeof p.y === "number") {
-              x = p.x;
-              y = p.y;
-            } else {
-              const angle = (i / count) * Math.PI * 2;
-              const radius = 300;
-              x = Math.cos(angle) * radius + (Math.random() - 0.5) * 40;
-              y = Math.sin(angle) * radius + (Math.random() - 0.5) * 40;
-            }
-
-            return {
-              id: p.id,
-              name: p.name || "Unnamed",
-              imageUrl: p.image_url || undefined,
-              color,
-              group,
-              x,
-              y,
-            };
-          }) || [];
-
-        const links: LinkObject[] =
-          connections?.map((c) => ({
-            source: c.from_user_id,
-            target: c.to_user_id,
-          })) || [];
-
-        setGraphData({ nodes, links });
-      } catch (err: any) {
-        console.error("Graph fetch error:", err);
-        const msg = err?.message || "Failed to load network data.";
-        setError(msg);
-        toast.error(msg);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  // --------- Responsive sizing ----------
-  useEffect(() => {
-    const update = () => {
-      if (!containerRef.current) return;
-      setDimensions({
-        width: containerRef.current.offsetWidth,
-        height: containerRef.current.offsetHeight,
-      });
-    };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, [loading]);
-
-  // --------- Camera persistence ----------
-  const saveCamera = useCallback(() => {
-    if (!fgRef.current) return;
-    const cam = fgRef.current.cameraPosition();
-    if (!cam) return;
-    localStorage.setItem("synapse_camera", JSON.stringify(cam));
-  }, []);
-
-  // Debounce helper
-  const debounceRef = useRef<number | null>(null);
-  const debouncedSaveCamera = useCallback(() => {
-    if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    debounceRef.current = window.setTimeout(saveCamera, 250);
-  }, [saveCamera]);
-
-  // Apply saved camera after data is ready
-  useEffect(() => {
-    if (!fgRef.current || !graphData.nodes.length) return;
-    const saved = localStorage.getItem("synapse_camera");
-    if (!saved) return;
-    try {
-      const { x, y, z } = JSON.parse(saved);
-      fgRef.current.cameraPosition({ x, y, z });
-    } catch {
-      /* ignore */
-    }
-  }, [graphData]);
-
-  // --------- Node canvas renderer ----------
-  const nodeCanvasObject = useCallback(
-    (node: NodeObject, ctx: CanvasRenderingContext2D, globalScale: number) => {
-      const n = node as ProfileNode;
-      const label = n.name;
-      const r = 5;
-      const fontSize = 12 / globalScale;
-
-      // dot
-      ctx.beginPath();
-      ctx.arc(n.x!, n.y!, r, 0, 2 * Math.PI);
-      ctx.fillStyle = n.color;
-      ctx.fill();
-
-      // text
-      ctx.font = `${fontSize}px Sora`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = isDark ? "#E5E7EB" : "#1F2937";
-      ctx.fillText(label, n.x!, n.y! + r + 8 / globalScale);
-    },
-    [isDark]
+/* -----------------------------------------------------------
+   Utility Touch-ups for Technical UI
+----------------------------------------------------------- */
+.hr-thin {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(0,255,255,0) 0%,
+    rgba(0,255,255,0.35) 15%,
+    rgba(0,255,255,0.35) 85%,
+    rgba(0,255,255,0) 100%
   );
+}
 
-  // --------- Persist node drag (x,y) ----------
-  const onNodeDragEnd = async (node: NodeObject) => {
-    const n = node as ProfileNode;
-    // optimistic: already in graph state
-    try {
-      // If x/y columns do not exist in DB this will error; we safely ignore.
-      const { error } = await supabase
-        .from("community")
-        .update({ x: n.x, y: n.y } as any)
-        .eq("id", n.id);
+.badge-cyan {
+  border: 1px solid rgba(0,255,255,0.28);
+  background: rgba(0, 30, 36, 0.45);
+  color: hsl(var(--accent));
+  padding: 0.15rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
 
-      if (error) {
-        // Don’t spam the UI; just log.
-        console.debug("[SynapseTab] Skipped persisting x/y:", error.message);
-      }
-    } catch (err) {
-      console.debug("[SynapseTab] Persist x/y failed:", (err as any)?.message);
-    }
-  };
-
-  return (
-    <Card className="border-cyan/20 bg-background/50 h-[70vh] flex flex-col">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-cyan">
-          <Zap />
-          <span>Synapse View</span>
-          <span className="text-sm text-muted-foreground"> — clustered by skills</span>
-        </CardTitle>
-      </CardHeader>
-
-      <CardContent ref={containerRef} className="flex-grow relative">
-        {loading && (
-          <div className="absolute inset-0 flex flex-col justify-center items-center bg-background/50">
-            <Loader2 className="h-8 w-8 text-cyan animate-spin" />
-            <p className="mt-4 text-muted-foreground">Building network visualization...</p>
-          </div>
-        )}
-
-        {error && (
-          <div className="absolute inset-0 flex flex-col justify-center items-center bg-destructive/10 rounded-lg">
-            <ServerCrash className="h-8 w-8 text-destructive mx-auto mb-2" />
-            <p className="text-destructive-foreground font-semibold">Network Error</p>
-            <p className="text-sm text-muted-foreground">{error}</p>
-          </div>
-        )}
-
-        {!loading && !error && (
-          <>
-            {/* Optional: quick controls */}
-            <button
-              className="absolute right-3 top-3 px-3 py-1 rounded bg-cyan-600 hover:bg-cyan-700 text-white text-xs"
-              onClick={() => fgRef.current?.cameraPosition({ x: 0, y: 0, z: 300 })}
-            >
-              Reset View
-            </button>
-
-            <ForceGraph2D
-              ref={fgRef}
-              width={dimensions.width}
-              height={dimensions.height}
-              graphData={graphData}
-              backgroundColor="transparent"
-              nodeLabel={(n) => `${(n as ProfileNode).name}\n${(n as ProfileNode).group}`}
-              nodeCanvasObject={nodeCanvasObject}
-
-              // ✨ Radiating lines / energy particles
-              linkDirectionalParticles={3}
-              linkDirectionalParticleWidth={2}
-              linkDirectionalParticleSpeed={() => Math.random() * 0.02 + 0.005}
-              linkColor={() => "rgba(0, 207, 255, 0.35)"}
-
-              // Interactivity + persistence
-              enableNodeDrag={true}
-              onNodeDragEnd={onNodeDragEnd}
-
-              // Save camera/zoom/pan
-              onZoomEnd={debouncedSaveCamera}
-              onEngineStop={debouncedSaveCamera}
-            />
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
+/* Tooltip shell (for future technical overlays) */
+.tooltip {
+  @apply rounded px-2 py-1 text-xs;
+  border: 1px solid rgba(0,255,255,0.25);
+  background: rgba(0,20,24,0.85);
+  color: hsl(var(--accent));
+  backdrop-filter: blur(6px) saturate(120%);
 }
