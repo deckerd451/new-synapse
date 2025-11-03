@@ -243,3 +243,15 @@ canvas {
   color: hsl(var(--accent));
   backdrop-filter: blur(6px) saturate(120%);
 }
+.tooltip {
+  @apply rounded px-2 py-1 text-xs;
+  border: 1px solid rgba(0,255,255,0.25);
+  background: rgba(0,20,24,0.85);
+  color: hsl(var(--accent));
+  backdrop-filter: blur(6px) saturate(120%);
+  pointer-events: none;
+  max-width: 220px;
+}
+.tooltip p {
+  margin: 0;
+}
