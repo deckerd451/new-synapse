@@ -14,7 +14,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { useTheme } from "@/hooks/use-theme";
 import { toast } from "sonner";
 
-// === Types ===
 interface ProfileNode extends NodeObject {
   id: string;
   name: string;
@@ -56,16 +55,10 @@ export function SynapseTab() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [energyPulse, setEnergyPulse] = useState(0);
   const [ambientColor, setAmbientColor] = useState("rgba(0,255,255,0.25)");
+  const mousePos = useRef({ x: 0, y: 0 });
 
   // === Skill palette ===
-  const skillColors = [
-    "#FFD700", // gold
-    "#00FFFF", // cyan
-    "#FF69B4", // pink
-    "#ADFF2F", // lime
-    "#FFA500", // orange
-    "#9370DB", // purple
-  ];
+  const skillColors = ["#FFD700", "#00FFFF", "#FF69B4", "#ADFF2F", "#FFA500", "#9370DB"];
 
   const colorFor = (group: string) =>
     skillColors[
@@ -73,14 +66,11 @@ export function SynapseTab() {
         skillColors.length
     ];
 
-  // === Infer dominant cluster color ===
   const computeAmbientColor = (nodes: ProfileNode[]) => {
     if (!nodes.length) return isDark ? "rgba(0,255,255,0.25)" : "rgba(255,215,0,0.25)";
-    const colorWeights: Record<string, number> = {};
-    nodes.forEach((n) => {
-      colorWeights[n.color] = (colorWeights[n.color] || 0) + 1;
-    });
-    const dominant = Object.entries(colorWeights).sort((a, b) => b[1] - a[1])[0][0];
+    const weights: Record<string, number> = {};
+    nodes.forEach((n) => (weights[n.color] = (weights[n.color] || 0) + 1));
+    const dominant = Object.entries(weights).sort((a, b) => b[1] - a[1])[0][0];
     return isDark
       ? dominant.replace(")", ",0.3)").replace("rgb", "rgba")
       : dominant.replace(")", ",0.25)").replace("rgb", "rgba");
@@ -154,7 +144,7 @@ export function SynapseTab() {
     })();
   }, []);
 
-  // === Ambient animation ===
+  // === Ambient parallax field ===
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -168,7 +158,7 @@ export function SynapseTab() {
     resize();
     window.addEventListener("resize", resize);
 
-    const particles = Array.from({ length: 120 }, () => ({
+    const particles = Array.from({ length: 140 }, () => ({
       x: Math.random() * canvas.width,
       y: Math.random() * canvas.height,
       size: Math.random() * 2 + 0.5,
@@ -188,19 +178,26 @@ export function SynapseTab() {
       );
 
       particles.forEach((p) => {
+        // gentle parallax motion
         p.y -= p.speed;
         p.x += p.drift;
         if (p.y < 0) p.y = canvas.height;
         if (p.x < 0) p.x = canvas.width;
         if (p.x > canvas.width) p.x = 0;
 
-        const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 10);
+        const dx = (mousePos.current.x - canvas.width / 2) * 0.0008;
+        const dy = (mousePos.current.y - canvas.height / 2) * 0.0008;
+
+        const offsetX = p.x + dx * p.size * 30;
+        const offsetY = p.y + dy * p.size * 30;
+
+        const gradient = ctx.createRadialGradient(offsetX, offsetY, 0, offsetX, offsetY, p.size * 10);
         gradient.addColorStop(0, glow);
         gradient.addColorStop(1, "transparent");
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size * 10, 0, 2 * Math.PI);
+        ctx.arc(offsetX, offsetY, p.size * 10, 0, 2 * Math.PI);
         ctx.fill();
       });
 
@@ -209,13 +206,20 @@ export function SynapseTab() {
     };
 
     draw();
+
+    const handleMouse = (e: MouseEvent) => {
+      mousePos.current = { x: e.clientX, y: e.clientY };
+    };
+    window.addEventListener("mousemove", handleMouse);
+
     return () => {
       cancelAnimationFrame(anim);
+      window.removeEventListener("mousemove", handleMouse);
       window.removeEventListener("resize", resize);
     };
   }, [ambientColor, energyPulse]);
 
-  // === Responsive size ===
+  // === Responsive sizing ===
   useEffect(() => {
     const update = () => {
       if (!containerRef.current) return;
@@ -229,7 +233,6 @@ export function SynapseTab() {
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  // === Camera memory ===
   const saveCamera = useCallback(() => {
     if (!fgRef.current) return;
     const cam = fgRef.current.cameraPosition();
@@ -249,7 +252,6 @@ export function SynapseTab() {
     if (graphData.nodes.length) setTimeout(restoreCamera, 500);
   }, [graphData]);
 
-  // === Node render ===
   const nodeCanvasObject = useCallback(
     (node: NodeObject, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const n = node as ProfileNode;
@@ -278,7 +280,6 @@ export function SynapseTab() {
     [isDark]
   );
 
-  // === Reactive Controls ===
   const pulse = (intensity = 80) => setEnergyPulse(intensity);
 
   const handleResetView = useCallback(() => {
@@ -330,16 +331,13 @@ export function SynapseTab() {
           <Zap className="animate-pulse" />
           <span>Synapse View</span>
           <span className="text-sm text-muted-foreground">
-            — living, reactive, color-adaptive
+            — adaptive, reactive, parallax
           </span>
         </CardTitle>
       </CardHeader>
 
       <CardContent ref={containerRef} className="flex-grow relative">
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 z-0 pointer-events-none transition-all duration-500"
-        />
+        <canvas ref={canvasRef} className="absolute inset-0 z-0 pointer-events-none transition-all duration-500" />
 
         {loading && (
           <div className="absolute inset-0 flex flex-col justify-center items-center bg-background/50 backdrop-blur-sm z-10">
@@ -358,36 +356,12 @@ export function SynapseTab() {
 
         {!loading && !error && (
           <>
-            {/* Floating Controls */}
+            {/* Controls */}
             <div className="absolute right-4 top-4 flex flex-col gap-2 z-20">
-              <button
-                onClick={handleResetView}
-                title="Recenter"
-                className="p-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-md transition transform hover:scale-110"
-              >
-                <RefreshCw className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => handleZoom(1.2)}
-                title="Zoom In"
-                className="p-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-md transition transform hover:scale-110"
-              >
-                <ZoomIn className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => handleZoom(0.8)}
-                title="Zoom Out"
-                className="p-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-md transition transform hover:scale-110"
-              >
-                <ZoomOut className="w-4 h-4" />
-              </button>
-              <button
-                onClick={shuffleLayout}
-                title="Shuffle Layout"
-                className="p-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-md transition transform hover:scale-110"
-              >
-                <Shuffle className="w-4 h-4" />
-              </button>
+              <button onClick={handleResetView} title="Recenter" className="p-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-md transition transform hover:scale-110"><RefreshCw className="w-4 h-4" /></button>
+              <button onClick={() => handleZoom(1.2)} title="Zoom In" className="p-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-md transition transform hover:scale-110"><ZoomIn className="w-4 h-4" /></button>
+              <button onClick={() => handleZoom(0.8)} title="Zoom Out" className="p-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-md transition transform hover:scale-110"><ZoomOut className="w-4 h-4" /></button>
+              <button onClick={shuffleLayout} title="Shuffle Layout" className="p-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-full shadow-md transition transform hover:scale-110"><Shuffle className="w-4 h-4" /></button>
             </div>
 
             <ForceGraph2D
@@ -396,9 +370,7 @@ export function SynapseTab() {
               height={dimensions.height}
               graphData={graphData}
               backgroundColor="transparent"
-              nodeLabel={(n) =>
-                `${(n as ProfileNode).name}\n${(n as ProfileNode).group}`
-              }
+              nodeLabel={(n) => `${(n as ProfileNode).name}\n${(n as ProfileNode).group}`}
               nodeCanvasObject={nodeCanvasObject}
               linkDirectionalParticles={3}
               linkDirectionalParticleWidth={2}
