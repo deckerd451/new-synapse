@@ -1,9 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL!;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY!;
+// ✅ Fallback to hardcoded public keys when env vars aren’t available (e.g. GitHub Pages)
+const supabaseUrl =
+  import.meta.env.VITE_SUPABASE_URL ||
+  "https://hvmotpzhliufzomewzfl.supabase.co";
+const supabaseAnonKey =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh2bW90cHpobGl1ZnpvbWV3emZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI1NzY2NDUsImV4cCI6MjA1ODE1MjY0NX0.foHTGZVtRjFvxzDfMf1dpp0Zw4XFfD-FPZK-zRnjc6s";
 
-// ✅ Create client in browser-safe mode
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("Supabase credentials are missing!");
+}
+
+// ✅ Create client (browser-safe mode)
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
     fetch: (...args) => fetch(...args),
@@ -14,7 +23,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-console.log("[Supabase] Initialized in browser-safe mode");
+console.log("[Supabase] Initialized:", supabaseUrl);
 
 // 🧠 Ensure community record exists for logged-in user
 export async function ensureCommunityUser() {
@@ -29,7 +38,6 @@ export async function ensureCommunityUser() {
       return;
     }
 
-    // Check if a record exists for this user
     const { data: existing, error: fetchError } = await supabase
       .from("community")
       .select("id, user_id, email, name")
@@ -41,18 +49,19 @@ export async function ensureCommunityUser() {
       return;
     }
 
-    // If record exists and user_id already matches, we're good
     if (existing && existing.user_id) {
       console.log("[ensureCommunityUser] Existing valid record found ✅");
       return;
     }
 
-    // Create or repair record
     const payload = {
       id: existing?.id,
       user_id: user.id,
       email: user.email,
-      name: existing?.name || user.user_metadata?.full_name || user.email.split("@")[0],
+      name:
+        existing?.name ||
+        user.user_metadata?.full_name ||
+        user.email.split("@")[0],
       updated_at: new Date().toISOString(),
     };
 
@@ -60,11 +69,9 @@ export async function ensureCommunityUser() {
       .from("community")
       .upsert(payload, { onConflict: "email" });
 
-    if (upsertError) {
+    if (upsertError)
       console.error("[ensureCommunityUser] Upsert error:", upsertError.message);
-    } else {
-      console.log("[ensureCommunityUser] Community record ensured ✅", payload);
-    }
+    else console.log("[ensureCommunityUser] Community record ensured ✅", payload);
   } catch (err: any) {
     console.error("[ensureCommunityUser] Unexpected error:", err.message);
   }
