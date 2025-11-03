@@ -52,6 +52,39 @@ export function SearchTab() {
   useEffect(() => {
     fetchConnections();
   }, [user]);
+  useEffect(() => {
+  // Subscribe to endorsement changes in real-time
+  const channel = supabase
+    .channel('endorsement_updates')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'endorsements' },
+      (payload) => {
+        console.log('🔄 Realtime update:', payload);
+        const { new: newEndorsement } = payload;
+
+        if (newEndorsement?.endorsed_user_id && newEndorsement?.skill) {
+          // Animate or visually glow the updated skill
+          setEndorsed((prev) => {
+            const targetId = newEndorsement.endorsed_user_id;
+            const updated = new Set(prev[targetId] || []);
+            updated.add(newEndorsement.skill);
+            return { ...prev, [targetId]: Array.from(updated) };
+          });
+
+          toast.success(
+            `⭐ ${newEndorsement.skill} endorsed for user ${newEndorsement.endorsed_user_id}!`
+          );
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
+
 
   const handleConnect = async (target: any) => {
     try {
