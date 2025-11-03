@@ -14,14 +14,14 @@ export function SearchTab() {
   const [connections, setConnections] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [endorsed, setEndorsed] = useState<{ [key: string]: string[] }>({});
+  const [endorsed, setEndorsed] = useState<{ [key: string]: string[] }>({}); // { target_id: [skill1, skill2] }
 
-  // 🔑 Load current user
+  // 🔑 Current user
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
   }, []);
 
-  // 🔍 Search users by name or skills
+  // 🔍 Handle search
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) {
@@ -42,7 +42,7 @@ export function SearchTab() {
     setLoading(false);
   };
 
-  // 🧠 Load connections
+  // 🧠 Load all user connections
   const fetchConnections = async () => {
     if (!user) return;
     const { data, error } = await supabase
@@ -89,7 +89,7 @@ export function SearchTab() {
     }
   };
 
-  // ⭐ Endorse a skill and trigger leaderboard update
+  // ⭐ Endorse skill
   const handleEndorse = async (skill: string, target: any) => {
     if (!user) {
       toast.error('Please log in to endorse.');
@@ -118,15 +118,10 @@ export function SearchTab() {
         ...prev,
         [targetId]: [...(prev[targetId] || []), skill],
       }));
-
-      // Optional: locally refresh leaderboard count (for instant feedback)
-      await supabase
-        .from('community')
-        .update({ endorsements: (target.endorsements || 0) + 1 })
-        .eq('id', targetId);
     }
   };
 
+  // 🧩 Helper: connection status
   const getConnectionStatus = (target: any) => {
     const toId = target.user_id || target.id;
     const match = connections.find(
@@ -137,8 +132,10 @@ export function SearchTab() {
     return match?.status || 'none';
   };
 
+  // 🎨 Helper: render skill chips with endorsement button
   const renderSkills = (profile: any) => {
     if (!profile.skills) return null;
+
     let skillsArray: string[] = [];
     if (typeof profile.skills === 'string') {
       try {
@@ -146,7 +143,9 @@ export function SearchTab() {
       } catch {
         skillsArray = profile.skills.split(',').map((s: string) => s.trim());
       }
-    } else if (Array.isArray(profile.skills)) skillsArray = profile.skills;
+    } else if (Array.isArray(profile.skills)) {
+      skillsArray = profile.skills;
+    }
 
     return (
       <div className="flex flex-wrap justify-center gap-2 mt-2">
@@ -220,9 +219,6 @@ export function SearchTab() {
                   />
                   <CardTitle className="text-yellow-400">{person.name}</CardTitle>
                   <p className="text-gray-400 text-sm">{person.email}</p>
-                  <p className="text-sm text-cyan-400 mt-1">
-                    ⭐ {person.endorsements || 0} Endorsements
-                  </p>
                 </CardHeader>
                 <CardContent>
                   {renderSkills(person)}
