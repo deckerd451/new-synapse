@@ -18,9 +18,8 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Upload, Check, X } from "lucide-react";
 import { supabase, ensureCommunityUser } from "@/lib/supabaseClient";
-import { Profile } from "@shared/types";
 
-// 🧩 Validation schema
+// 🧩 Schema
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
   bio: z.string().max(500, "Bio cannot exceed 500 characters.").optional(),
@@ -43,65 +42,72 @@ export function ProfileTab() {
     defaultValues: { name: "", bio: "", skills: "" },
   });
 
-  // Load profile data
+  // 🧠 Load profile data
   useEffect(() => {
     if (profile) {
       form.reset({
         name: profile.name || "",
         bio: profile.bio || "",
-        skills: Array.isArray(profile.skills)
-          ? profile.skills.join(", ")
-          : (profile.skills as string) || "",
+        skills:
+          typeof profile.skills === "string"
+            ? profile.skills
+            : Array.isArray(profile.skills)
+            ? profile.skills.join(", ")
+            : "",
       });
     }
   }, [profile, form]);
 
-  // 🧠 Update Supabase
+  // 🧩 Normalize skills before saving
+  const cleanSkills = (skills?: string) => {
+    if (!skills) return "";
+    return skills
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .join(", ");
+  };
+
+  // 🧭 Handle form submit
   const onSubmit = async (data: ProfileFormValues) => {
     if (!profile) return;
     setLoading(true);
-    try {
-      await ensureCommunityUser(); // Ensure valid record
 
+    try {
+      await ensureCommunityUser();
       const { data: authData } = await supabase.auth.getUser();
       const user = authData?.user;
 
-      const updates: Profile = {
-        ...profile,
+      const updates = {
+        name: data.name,
+        bio: data.bio || "",
+        skills: cleanSkills(data.skills),
+        updated_at: new Date().toISOString(),
         user_id: user?.id || profile.user_id,
         email: profile.email || user?.email || "",
-        name: data.name,
-        bio: data.bio,
-        skills: data.skills
-          ? data.skills
-              .split(",")
-              .map((s) => s.trim().replace(/^\{|\}$/g, ""))
-              .filter(Boolean)
-          : [],
-        updated_at: new Date().toISOString(),
       };
 
       const { data: updatedProfile, error } = await supabase
         .from("community")
-        .upsert(updates, { onConflict: "email" })
+        .update(updates)
+        .eq("id", profile.id)
         .select()
         .single();
 
       if (error) throw error;
-
       setProfile(updatedProfile);
       toast.success("✅ Profile updated successfully!");
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || "Failed to update profile.");
+    } catch (err: any) {
+      console.error("Error updating profile:", err);
+      toast.error(err.message || "Failed to update profile.");
     } finally {
       setLoading(false);
     }
   };
 
-  // 🧭 Crop image
-  const cropToSquare = (file: File): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
+  // 🖼️ Crop image to square
+  const cropToSquare = (file: File): Promise<Blob> =>
+    new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (event) => {
         const img = new Image();
@@ -111,7 +117,7 @@ export function ProfileTab() {
           canvas.width = size;
           canvas.height = size;
           const ctx = canvas.getContext("2d");
-          if (!ctx) return reject(new Error("Canvas context not available"));
+          if (!ctx) return reject("Canvas context missing");
           ctx.drawImage(
             img,
             (img.width - size) / 2,
@@ -124,7 +130,7 @@ export function ProfileTab() {
             size
           );
           canvas.toBlob(
-            (blob) => (blob ? resolve(blob) : reject(new Error("Blob failed"))),
+            (blob) => (blob ? resolve(blob) : reject("Failed to create blob")),
             "image/jpeg",
             0.9
           );
@@ -134,10 +140,11 @@ export function ProfileTab() {
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
-  };
 
-  // 🖼️ Handle file change
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  // 🟨 File upload handler
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
@@ -150,10 +157,11 @@ export function ProfileTab() {
     }
   };
 
-  // 🟨 Confirm upload
+  // ✅ Confirm upload
   const confirmUpload = async () => {
     if (!previewBlob || !profile?.id) return;
     setUploading(true);
+
     try {
       await ensureCommunityUser();
 
@@ -161,24 +169,31 @@ export function ProfileTab() {
       const { error: uploadError } = await supabase.storage
         .from("hacksbucket")
         .upload(filePath, previewBlob, { upsert: true });
+
       if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage.from("hacksbucket").getPublicUrl(filePath);
+      const { data } = supabase.storage
+        .from("hacksbucket")
+        .getPublicUrl(filePath);
       const publicUrl = data.publicUrl;
 
       const { error: updateError } = await supabase
         .from("community")
-        .update({ image_url: publicUrl, updated_at: new Date().toISOString() })
+        .update({
+          image_url: publicUrl,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", profile.id);
+
       if (updateError) throw updateError;
 
       setProfile({ ...profile, image_url: publicUrl });
-      toast.success("✅ Profile photo updated!");
       setPreviewUrl(null);
       setPreviewBlob(null);
+      toast.success("✅ Profile photo updated!");
     } catch (err: any) {
       console.error(err);
-      toast.error(err.message || "Failed to upload photo.");
+      toast.error(err.message || "Upload failed.");
     } finally {
       setUploading(false);
     }
@@ -189,19 +204,25 @@ export function ProfileTab() {
     setPreviewBlob(null);
   };
 
+  // 🧱 UI
   return (
     <>
       <div className="space-y-8">
         <div className="flex items-center gap-6">
           <Avatar className="h-24 w-24 border-2 border-gold/50">
-            <AvatarImage src={profile?.image_url || undefined} alt={profile?.name || "User"} />
+            <AvatarImage
+              src={profile?.image_url || undefined}
+              alt={profile?.name || "User"}
+            />
             <AvatarFallback className="bg-muted text-3xl">
               {profile?.name?.charAt(0) || "U"}
             </AvatarFallback>
           </Avatar>
 
           <div>
-            <h2 className="text-2xl font-bold">{profile?.name || "Your Profile"}</h2>
+            <h2 className="text-2xl font-bold">
+              {profile?.name || "Your Profile"}
+            </h2>
             <p className="text-muted-foreground">{profile?.email}</p>
 
             <div className="mt-2 flex gap-2">
@@ -213,7 +234,11 @@ export function ProfileTab() {
                 onChange={handleFileChange}
                 className="hidden"
               />
-              <Button size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+              <Button
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+              >
                 <Upload className="mr-2 h-4 w-4" />
                 Upload Photo
               </Button>
@@ -222,7 +247,10 @@ export function ProfileTab() {
         </div>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="space-y-6 max-w-xl"
+          >
             <FormField
               control={form.control}
               name="name"
@@ -243,7 +271,11 @@ export function ProfileTab() {
                 <FormItem>
                   <FormLabel>Bio</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Tell us about yourself..." className="resize-none" {...field} />
+                    <Textarea
+                      placeholder="Tell us about yourself..."
+                      className="resize-none"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -256,9 +288,14 @@ export function ProfileTab() {
                 <FormItem>
                   <FormLabel>Skills</FormLabel>
                   <FormControl>
-                    <Input placeholder="React, TypeScript, Node.js" {...field} />
+                    <Input
+                      placeholder="React, TypeScript, Node.js"
+                      {...field}
+                    />
                   </FormControl>
-                  <p className="text-sm text-muted-foreground">Enter skills separated by commas.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Enter skills separated by commas.
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}
@@ -277,7 +314,9 @@ export function ProfileTab() {
       {previewUrl && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
           <div className="bg-background rounded-2xl p-8 shadow-lg flex flex-col items-center">
-            <h2 className="text-xl font-semibold mb-4 text-center">Preview Your New Profile Photo</h2>
+            <h2 className="text-xl font-semibold mb-4 text-center">
+              Preview Your New Profile Photo
+            </h2>
             <img
               src={previewUrl}
               alt="Preview"
