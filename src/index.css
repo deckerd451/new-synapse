@@ -64,3 +64,18 @@
     text-rendering: optimizeLegibility;
   }
 }
+/* src/index.css additions */
+.hud-btn {
+  --tw-ring-color: rgba(0, 255, 255, 0.35);
+  border-color: rgba(0, 255, 255, 0.35) !important;
+  background: rgba(8, 12, 16, 0.6);
+}
+.hud-btn:hover {
+  background: rgba(12, 20, 26, 0.75);
+}
+
+canvas {
+  image-rendering: optimizeQuality;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
