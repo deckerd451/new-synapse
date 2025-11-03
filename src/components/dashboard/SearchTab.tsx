@@ -14,14 +14,12 @@ export function SearchTab() {
   const [connections, setConnections] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [endorsed, setEndorsed] = useState<{ [key: string]: string[] }>({}); // { target_id: [skill1, skill2] }
+  const [endorsed, setEndorsed] = useState<{ [key: string]: string[] }>({});
 
-  // 🔑 Current user
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
   }, []);
 
-  // 🔍 Handle search
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) {
@@ -42,7 +40,6 @@ export function SearchTab() {
     setLoading(false);
   };
 
-  // 🧠 Load all user connections
   const fetchConnections = async () => {
     if (!user) return;
     const { data, error } = await supabase
@@ -56,113 +53,112 @@ export function SearchTab() {
     fetchConnections();
   }, [user]);
 
- // ⚡ Create new connection (final version for your schema)
-const handleConnect = async (target: any) => {
-  try {
-    // Ensure the logged-in user exists in the community table
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError || !authData?.user) {
-      toast.error("Please log in first");
-      return;
+  const handleConnect = async (target: any) => {
+    try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData?.user) {
+        toast.error("Please log in first");
+        return;
+      }
+
+      const user = authData.user;
+
+      const { data: sourceProfile, error: sourceError } = await supabase
+        .from("community")
+        .select("id")
+        .eq("email", user.email)
+        .maybeSingle();
+
+      if (sourceError) throw sourceError;
+      if (!sourceProfile) {
+        toast.error("Your community profile is missing.");
+        return;
+      }
+
+      const toId = target.id || target.user_id;
+      if (!toId) {
+        toast.error("Target user not found.");
+        return;
+      }
+
+      const { data: existing, error: checkError } = await supabase
+        .from("connections")
+        .select("*")
+        .or(`from_user_id.eq.${sourceProfile.id},to_user_id.eq.${sourceProfile.id}`)
+        .or(`from_user_id.eq.${toId},to_user_id.eq.${toId}`)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+      if (existing) {
+        toast.info("You are already connected or pending.");
+        return;
+      }
+
+      const { error: insertError } = await supabase.from("connections").insert({
+        from_user_id: sourceProfile.id,
+        to_user_id: toId,
+        status: "pending",
+        type: "generic",
+        created_at: new Date().toISOString(),
+      });
+
+      if (insertError) throw insertError;
+
+      toast.success(`Connection request sent to ${target.name}!`);
+      fetchConnections();
+    } catch (err: any) {
+      console.error("Connection error:", err);
+      toast.error(err.message || "Failed to connect.");
     }
+  };
 
-    const user = authData.user;
+  const handleEndorse = async (skill: string, target: any) => {
+    try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData?.user) {
+        toast.error("Please log in to endorse.");
+        return;
+      }
 
-    // Get the current user's community record
-    const { data: sourceProfile, error: sourceError } = await supabase
-      .from("community")
-      .select("id")
-      .eq("email", user.email)
-      .maybeSingle();
+      const { data: sourceProfile, error: profileError } = await supabase
+        .from("community")
+        .select("id")
+        .eq("email", authData.user.email)
+        .maybeSingle();
 
-    if (sourceError) throw sourceError;
-    if (!sourceProfile) {
-      toast.error("Your community profile is missing.");
-      return;
+      if (profileError) throw profileError;
+      if (!sourceProfile) {
+        toast.error("Your community profile is missing.");
+        return;
+      }
+
+      const fromId = sourceProfile.id;
+      const toId = target.user_id || target.id;
+      const already = endorsed[toId]?.includes(skill);
+      if (already) {
+        toast.info(`You already endorsed ${target.name} for ${skill}.`);
+        return;
+      }
+
+      const { error: insertError } = await supabase.from("endorsements").insert({
+        endorsed_by_user_id: fromId,
+        endorsed_user_id: toId,
+        skill,
+      });
+
+      if (insertError) throw insertError;
+
+      toast.success(`You endorsed ${target.name} for ${skill}!`);
+      setEndorsed((prev) => ({
+        ...prev,
+        [toId]: [...(prev[toId] || []), skill],
+      }));
+    } catch (err: any) {
+      console.error("Endorsement error:", err);
+      toast.error(err.message || "Failed to endorse.");
     }
+  };
 
-    // Get the target user's community ID
-    const toId = target.id || target.user_id;
-    if (!toId) {
-      toast.error("Target user not found.");
-      return;
-    }
-
-    // Prevent duplicates
-    const { data: existing, error: checkError } = await supabase
-      .from("connections")
-      .select("*")
-      .or(`from_user_id.eq.${sourceProfile.id},to_user_id.eq.${sourceProfile.id}`)
-      .or(`from_user_id.eq.${toId},to_user_id.eq.${toId}`)
-      .maybeSingle();
-
-    if (checkError) throw checkError;
-    if (existing) {
-      toast.info("You are already connected or pending.");
-      return;
-    }
-
-    // ✅ Insert connection using your column names
-    const { error: insertError } = await supabase.from("connections").insert({
-      from_user_id: sourceProfile.id,
-      to_user_id: toId,
-      status: "pending",
-      type: "generic",
-      created_at: new Date().toISOString(),
-    });
-
-    if (insertError) throw insertError;
-
-    toast.success(`Connection request sent to ${target.name}!`);
-    fetchConnections(); // refresh UI
-  } catch (err: any) {
-    console.error("Connection error:", err);
-    toast.error(err.message || "Failed to connect.");
-  }
-};
-
-
-
- // ⭐ Endorse skill
-const handleEndorse = async (skill: string, target: any) => {
-  if (!user) {
-    toast.error('Please log in to endorse.');
-    return;
-  }
-
-  const targetId = target.user_id || target.id;
-  const already = endorsed[targetId]?.includes(skill);
-  if (already) {
-    toast.info(`You already endorsed ${target.name} for ${skill}.`);
-    return;
-  }
-
-  try {
-    const { error } = await supabase.from('endorsements').insert({
-  endorsed_by_user_id: user.id,  // 👈 person giving the endorsement
-  endorsed_user_id: targetId,    // 👈 person being endorsed
-  skill,                         // 👈 name of the skill
-});
-
-
-    if (error) {
-      console.error('Endorsement insert failed:', error);
-      toast.error('Failed to endorse.');
-      return;
-    }
-
-    toast.success(`You endorsed ${target.name} for ${skill}!`);
-    setEndorsed((prev) => ({
-      ...prev,
-      [targetId]: [...(prev[targetId] || []), skill],
-    }));
-  } catch (err) {
-    console.error('Endorsement error:', err);
-    toast.error('Failed to endorse.');
-  }
-};
-
-  // 🧩 Helper: connection status
   const getConnectionStatus = (target: any) => {
     const toId = target.user_id || target.id;
     const match = connections.find(
@@ -173,7 +169,6 @@ const handleEndorse = async (skill: string, target: any) => {
     return match?.status || 'none';
   };
 
-  // 🎨 Helper: render skill chips with endorsement button
   const renderSkills = (profile: any) => {
     if (!profile.skills) return null;
 
@@ -263,33 +258,31 @@ const handleEndorse = async (skill: string, target: any) => {
                 </CardHeader>
                 <CardContent>
                   {renderSkills(person)}
-                 {/* 🧠 Bio preview with truncation */}
-{person.bio ? (
-  <p
-    className="text-gray-500 text-sm mt-3 cursor-pointer hover:text-gray-300 transition"
-    title={person.bio} // full text on hover
-    onClick={(e) => {
-      const p = e.currentTarget;
-      if (p.dataset.expanded === "true") {
-        p.innerText =
-          person.bio.length > 100
-            ? person.bio.slice(0, 100).trim() + "..."
-            : person.bio;
-        p.dataset.expanded = "false";
-      } else {
-        p.innerText = person.bio.trim();
-        p.dataset.expanded = "true";
-      }
-    }}
-  >
-    {person.bio.length > 100
-      ? person.bio.slice(0, 100).trim() + "..."
-      : person.bio}
-  </p>
-) : (
-  <p className="text-gray-600 text-sm mt-3 italic">No bio available.</p>
-)}
-
+                  {person.bio ? (
+                    <p
+                      className="text-gray-500 text-sm mt-3 cursor-pointer hover:text-gray-300 transition"
+                      title={person.bio}
+                      onClick={(e) => {
+                        const p = e.currentTarget;
+                        if (p.dataset.expanded === "true") {
+                          p.innerText =
+                            person.bio.length > 100
+                              ? person.bio.slice(0, 100).trim() + "..."
+                              : person.bio;
+                          p.dataset.expanded = "false";
+                        } else {
+                          p.innerText = person.bio.trim();
+                          p.dataset.expanded = "true";
+                        }
+                      }}
+                    >
+                      {person.bio.length > 100
+                        ? person.bio.slice(0, 100).trim() + "..."
+                        : person.bio}
+                    </p>
+                  ) : (
+                    <p className="text-gray-600 text-sm mt-3 italic">No bio available.</p>
+                  )}
 
                   {status === 'none' ? (
                     <Button
