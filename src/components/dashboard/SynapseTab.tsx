@@ -6,227 +6,285 @@ import { supabase } from "@/lib/supabaseClient";
 import { useTheme } from "@/hooks/use-theme";
 import { toast } from "sonner";
 
+// =============== Types ===============
 interface ProfileNode extends NodeObject {
   id: string;
   name: string;
-  group?: string;
-  color?: string;
   imageUrl?: string;
+  color: string;
+  group: string;
+  x?: number;
+  y?: number;
+  fx?: number;
+  fy?: number;
 }
 
-interface NodeMetrics {
-  connections: number;
-  endorsements: number;
-  bio?: string;
+interface ConnectionRow {
+  id: string;
+  from_user_id: string;
+  to_user_id: string;
 }
 
+interface CommunityRow {
+  id: string;
+  name: string | null;
+  image_url: string | null;
+  skills: string | string[] | null;
+  x?: number | null;
+  y?: number | null;
+}
+
+// =============== Component ===============
 export function SynapseTab() {
   const { isDark } = useTheme();
-  const fgRef = useRef<any>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [graphData, setGraphData] = useState<{ nodes: ProfileNode[]; links: LinkObject[] }>({ nodes: [], links: [] });
+
+  const [graphData, setGraphData] = useState<{ nodes: ProfileNode[]; links: LinkObject[] }>({
+    nodes: [],
+    links: [],
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const fgRef = useRef<any>(null);
 
-  const [hoveredNode, setHoveredNode] = useState<ProfileNode | null>(null);
-  const [tooltip, setTooltip] = useState({ x: 0, y: 0, visible: false });
-  const [metricsCache, setMetricsCache] = useState<Record<string, NodeMetrics>>({});
+  // --------- Color palette & grouping ----------
+  const skillColors = ["#FFD700", "#00FFFF", "#FF69B4", "#ADFF2F", "#FFA500", "#9370DB"];
 
-  // 🧠 Fetch network data
+  const colorFor = (group: string) => {
+    const h = Math.abs(group.split("").reduce((a, c) => a + c.charCodeAt(0), 0));
+    return skillColors[h % skillColors.length];
+  };
+
+  const getFirstSkill = (skills: CommunityRow["skills"]) => {
+    if (!skills) return "General";
+    if (Array.isArray(skills)) return skills[0] || "General";
+    try {
+      const maybe = JSON.parse(skills as string);
+      if (Array.isArray(maybe) && maybe.length) return String(maybe[0]);
+    } catch {
+      const parts = String(skills)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (parts.length) return parts[0];
+    }
+    return "General";
+  };
+
+  // --------- Data fetch ----------
   useEffect(() => {
-    const fetchGraphData = async () => {
+    (async () => {
       setLoading(true);
+      setError(null);
       try {
-        const { data: profiles } = await supabase.from("community").select("id, name, image_url, skills");
-        const { data: connections } = await supabase.from("connections").select("id, from_user_id, to_user_id");
+        const { data: profiles, error: profilesError } = await supabase
+          .from("community")
+          .select<CommunityRow>("id, name, image_url, skills, x, y");
+        if (profilesError) throw profilesError;
 
-        const nodes =
-          profiles?.map((p) => ({
-            id: p.id,
-            name: p.name || "Unnamed",
-            group: Array.isArray(p.skills) ? p.skills[0] : "General",
-            color: "#00FFFF",
-            imageUrl: p.image_url || undefined,
-          })) || [];
+        const { data: connections, error: connectionsError } = await supabase
+          .from("connections")
+          .select<ConnectionRow>("id, from_user_id, to_user_id");
+        if (connectionsError) throw connectionsError;
 
-        const links =
+        const count = profiles?.length || 1;
+        const nodes: ProfileNode[] =
+          profiles?.map((p, i) => {
+            const group = getFirstSkill(p.skills);
+            const color = colorFor(group);
+
+            let x: number | undefined = undefined;
+            let y: number | undefined = undefined;
+            if (typeof p.x === "number" && typeof p.y === "number") {
+              x = p.x;
+              y = p.y;
+            } else {
+              const angle = (i / count) * Math.PI * 2;
+              const radius = 300;
+              x = Math.cos(angle) * radius + (Math.random() - 0.5) * 40;
+              y = Math.sin(angle) * radius + (Math.random() - 0.5) * 40;
+            }
+
+            return {
+              id: p.id,
+              name: p.name || "Unnamed",
+              imageUrl: p.image_url || undefined,
+              color,
+              group,
+              x,
+              y,
+            };
+          }) || [];
+
+        const links: LinkObject[] =
           connections?.map((c) => ({
             source: c.from_user_id,
             target: c.to_user_id,
           })) || [];
 
         setGraphData({ nodes, links });
-      } catch (err) {
-        console.error(err);
-        toast.error("Failed to load network data.");
+      } catch (err: any) {
+        console.error("Graph fetch error:", err);
+        const msg = err?.message || "Failed to load network data.";
+        setError(msg);
+        toast.error(msg);
       } finally {
         setLoading(false);
       }
-    };
-    fetchGraphData();
+    })();
   }, []);
 
-  // 📏 Resize handling
+  // --------- Responsive sizing ----------
   useEffect(() => {
     const update = () => {
-      if (containerRef.current) {
-        setDimensions({
-          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight,
-        });
-      }
+      if (!containerRef.current) return;
+      setDimensions({
+        width: containerRef.current.offsetWidth,
+        height: containerRef.current.offsetHeight,
+      });
     };
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
+  }, [loading]);
+
+  // --------- Camera persistence ----------
+  const saveCamera = useCallback(() => {
+    if (!fgRef.current) return;
+    const cam = fgRef.current.cameraPosition();
+    if (!cam) return;
+    localStorage.setItem("synapse_camera", JSON.stringify(cam));
   }, []);
 
-  // 🧭 Track mouse
+  const debounceRef = useRef<number | null>(null);
+  const debouncedSaveCamera = useCallback(() => {
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(saveCamera, 250);
+  }, [saveCamera]);
+
   useEffect(() => {
-    const handleMove = (e: MouseEvent) => {
-      setTooltip((t) => ({ ...t, x: e.clientX + 12, y: e.clientY + 12 }));
-    };
-    window.addEventListener("mousemove", handleMove);
-    return () => window.removeEventListener("mousemove", handleMove);
-  }, []);
-
-  // 🔍 Fetch node metrics dynamically
-  const fetchNodeMetrics = useCallback(async (nodeId: string) => {
-    if (metricsCache[nodeId]) return metricsCache[nodeId];
-
+    if (!fgRef.current || !graphData.nodes.length) return;
+    const saved = localStorage.getItem("synapse_camera");
+    if (!saved) return;
     try {
-      const [{ count: connCount }, { count: endCount }, { data: profileData }] = await Promise.all([
-        supabase
-          .from("connections")
-          .select("*", { count: "exact", head: true })
-          .or(`from_user_id.eq.${nodeId},to_user_id.eq.${nodeId}`),
-        supabase
-          .from("endorsements")
-          .select("*", { count: "exact", head: true })
-          .eq("target_id", nodeId),
-        supabase
-          .from("community")
-          .select("bio")
-          .eq("id", nodeId)
-          .maybeSingle(),
-      ]);
-
-      const metrics = {
-        connections: connCount || 0,
-        endorsements: endCount || 0,
-        bio: profileData?.bio,
-      };
-      setMetricsCache((prev) => ({ ...prev, [nodeId]: metrics }));
-      return metrics;
-    } catch (err) {
-      console.error("Metrics fetch error:", err);
-      return { connections: 0, endorsements: 0 };
+      const { x, y, z } = JSON.parse(saved);
+      fgRef.current.cameraPosition({ x, y, z });
+    } catch {
+      /* ignore */
     }
-  }, [metricsCache]);
+  }, [graphData]);
 
-  // 🧬 Node render
+  // --------- Node rendering ----------
   const nodeCanvasObject = useCallback(
     (node: NodeObject, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const n = node as ProfileNode;
+      const label = n.name;
       const r = 5;
-      const gradient = ctx.createRadialGradient(n.x!, n.y!, 0, n.x!, n.y!, 18);
-      gradient.addColorStop(0, `${n.color || "#00FFFF"}AA`);
-      gradient.addColorStop(1, "transparent");
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(n.x!, n.y!, 18, 0, 2 * Math.PI);
-      ctx.fill();
+      const fontSize = 12 / globalScale;
 
       ctx.beginPath();
       ctx.arc(n.x!, n.y!, r, 0, 2 * Math.PI);
-      ctx.fillStyle = n.color || "#00FFFF";
+      ctx.fillStyle = n.color;
       ctx.fill();
 
-      const fontSize = 11 / globalScale;
-      ctx.font = `${fontSize}px JetBrains Mono`;
+      ctx.font = `${fontSize}px Sora`;
       ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      ctx.fillStyle = isDark ? "#E0E0E0" : "#222";
-      ctx.fillText(n.name, n.x!, n.y! + 8 / globalScale);
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = isDark ? "#E5E7EB" : "#1F2937";
+      ctx.fillText(label, n.x!, n.y! + r + 8 / globalScale);
     },
     [isDark]
   );
 
+  // --------- Persist node drag ----------
+  const onNodeDragEnd = async (node: NodeObject) => {
+    const n = node as ProfileNode;
+    try {
+      const { error } = await supabase
+        .from("community")
+        .update({ x: n.x, y: n.y } as any)
+        .eq("id", n.id);
+      if (error) console.debug("[SynapseTab] Skipped persisting x/y:", error.message);
+    } catch (err) {
+      console.debug("[SynapseTab] Persist x/y failed:", (err as any)?.message);
+    }
+  };
+
+  // --------- Reset View Button Handler ----------
+  const handleResetView = useCallback(() => {
+    if (!fgRef.current || !graphData.nodes.length) return;
+
+    // Compute bounding box of current graph
+    const bbox = fgRef.current.getGraphBbox();
+    const center = {
+      x: (bbox.x[0] + bbox.x[1]) / 2,
+      y: (bbox.y[0] + bbox.y[1]) / 2,
+      z: Math.max(bbox.z[1] - bbox.z[0], bbox.y[1] - bbox.y[0]) * 0.9, // auto zoom level
+    };
+
+    fgRef.current.cameraPosition(
+      { x: center.x, y: center.y, z: center.z },
+      { x: center.x, y: center.y, z: 0 },
+      1000 // ms animation
+    );
+  }, [graphData]);
+
+  // --------- Render ----------
   return (
     <Card className="border-cyan/20 bg-background/50 h-[70vh] flex flex-col">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-cyan">
-          <Zap /> Synapse Network — <span className="text-sm text-muted-foreground">Real-Time Data Probe</span>
+          <Zap />
+          <span>Synapse View</span>
+          <span className="text-sm text-muted-foreground"> — clustered by skills</span>
         </CardTitle>
       </CardHeader>
 
-      <CardContent ref={containerRef} className="relative flex-grow overflow-hidden">
-        <div className="synapse-bg" />
-
+      <CardContent ref={containerRef} className="flex-grow relative">
         {loading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div className="absolute inset-0 flex flex-col justify-center items-center bg-background/50">
             <Loader2 className="h-8 w-8 text-cyan animate-spin" />
-            <p className="text-muted-foreground mt-2">Analyzing network topology…</p>
+            <p className="mt-4 text-muted-foreground">Building network visualization...</p>
           </div>
         )}
 
         {error && (
-          <div className="absolute inset-0 flex items-center justify-center text-destructive">
-            <ServerCrash className="h-6 w-6 mr-2" /> {error}
+          <div className="absolute inset-0 flex flex-col justify-center items-center bg-destructive/10 rounded-lg">
+            <ServerCrash className="h-8 w-8 text-destructive mx-auto mb-2" />
+            <p className="text-destructive-foreground font-semibold">Network Error</p>
+            <p className="text-sm text-muted-foreground">{error}</p>
           </div>
         )}
 
         {!loading && !error && (
-          <ForceGraph2D
-            ref={fgRef}
-            width={dimensions.width}
-            height={dimensions.height}
-            graphData={graphData}
-            nodeCanvasObject={nodeCanvasObject}
-            linkColor={() => "rgba(0,255,255,0.25)"}
-            linkDirectionalParticles={3}
-            linkDirectionalParticleWidth={1.5}
-            linkDirectionalParticleSpeed={() => Math.random() * 0.008 + 0.004}
-            backgroundColor="transparent"
-            onNodeHover={async (node) => {
-              if (node) {
-                const n = node as ProfileNode;
-                const data = await fetchNodeMetrics(n.id);
-                setHoveredNode({ ...n, ...data });
-                setTooltip((t) => ({ ...t, visible: true }));
-              } else {
-                setTooltip((t) => ({ ...t, visible: false }));
-                setHoveredNode(null);
-              }
-            }}
-          />
-        )}
+          <>
+            <button
+              className="absolute right-3 top-3 px-3 py-1 rounded bg-cyan-600 hover:bg-cyan-700 text-white text-xs shadow-md"
+              onClick={handleResetView}
+            >
+              Reset View
+            </button>
 
-        {/* 🧠 Data Probe Tooltip */}
-        {tooltip.visible && hoveredNode && (
-          <div
-            className="tooltip animate-fade-in"
-            style={{
-              position: "fixed",
-              top: tooltip.y,
-              left: tooltip.x,
-              transform: "translate(10px, 10px)",
-              zIndex: 1000,
-            }}
-          >
-            <p className="font-mono text-xs text-cyan mb-1">{hoveredNode.name}</p>
-            <p className="text-[10px] text-cyan/70 leading-tight">
-              🧩 Connections: {metricsCache[hoveredNode.id]?.connections ?? "…"}
-              <br />
-              ⭐ Endorsements: {metricsCache[hoveredNode.id]?.endorsements ?? "…"}
-            </p>
-            {hoveredNode.bio && (
-              <p className="mt-1 text-[9px] text-cyan/60 max-w-[180px] italic line-clamp-2">
-                “{hoveredNode.bio.slice(0, 80)}…”
-              </p>
-            )}
-          </div>
+            <ForceGraph2D
+              ref={fgRef}
+              width={dimensions.width}
+              height={dimensions.height}
+              graphData={graphData}
+              backgroundColor="transparent"
+              nodeLabel={(n) => `${(n as ProfileNode).name}\n${(n as ProfileNode).group}`}
+              nodeCanvasObject={nodeCanvasObject}
+              linkDirectionalParticles={3}
+              linkDirectionalParticleWidth={2}
+              linkDirectionalParticleSpeed={() => Math.random() * 0.02 + 0.005}
+              linkColor={() => "rgba(0, 207, 255, 0.35)"}
+              enableNodeDrag={true}
+              onNodeDragEnd={onNodeDragEnd}
+              onZoomEnd={debouncedSaveCamera}
+              onEngineStop={debouncedSaveCamera}
+            />
+          </>
         )}
       </CardContent>
     </Card>
