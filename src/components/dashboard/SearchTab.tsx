@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient';
 import { Profile } from '@shared/types';
@@ -14,6 +14,7 @@ export function SearchTab() {
   const [connections, setConnections] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [endorsed, setEndorsed] = useState<{ [key: string]: string[] }>({}); // { target_id: [skill1, skill2] }
 
   // 🔑 Current user
   useEffect(() => {
@@ -88,6 +89,38 @@ export function SearchTab() {
     }
   };
 
+  // ⭐ Endorse skill
+  const handleEndorse = async (skill: string, target: any) => {
+    if (!user) {
+      toast.error('Please log in to endorse.');
+      return;
+    }
+
+    const targetId = target.user_id || target.id;
+    const already = endorsed[targetId]?.includes(skill);
+    if (already) {
+      toast.info(`You already endorsed ${target.name} for ${skill}.`);
+      return;
+    }
+
+    const { error } = await supabase.from('endorsements').insert({
+      endorser_id: user.id,
+      target_id: targetId,
+      skill,
+    });
+
+    if (error) {
+      toast.error('Failed to endorse.');
+      console.error(error);
+    } else {
+      toast.success(`You endorsed ${target.name} for ${skill}!`);
+      setEndorsed((prev) => ({
+        ...prev,
+        [targetId]: [...(prev[targetId] || []), skill],
+      }));
+    }
+  };
+
   // 🧩 Helper: connection status
   const getConnectionStatus = (target: any) => {
     const toId = target.user_id || target.id;
@@ -99,14 +132,13 @@ export function SearchTab() {
     return match?.status || 'none';
   };
 
-  // 🎨 Helper: render skill chips
+  // 🎨 Helper: render skill chips with endorsement button
   const renderSkills = (profile: any) => {
     if (!profile.skills) return null;
 
     let skillsArray: string[] = [];
     if (typeof profile.skills === 'string') {
       try {
-        // handle JSON-like or comma-separated formats
         skillsArray = JSON.parse(profile.skills);
       } catch {
         skillsArray = profile.skills.split(',').map((s: string) => s.trim());
@@ -117,14 +149,23 @@ export function SearchTab() {
 
     return (
       <div className="flex flex-wrap justify-center gap-2 mt-2">
-        {skillsArray.map((skill, i) => (
-          <span
-            key={i}
-            className="text-xs bg-blue-700/40 text-blue-200 px-2 py-1 rounded-full"
-          >
-            {skill}
-          </span>
-        ))}
+        {skillsArray.map((skill, i) => {
+          const isEndorsed = endorsed[profile.id]?.includes(skill);
+          return (
+            <button
+              key={i}
+              onClick={() => handleEndorse(skill, profile)}
+              className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${
+                isEndorsed
+                  ? 'bg-green-600/60 border-green-400 text-white'
+                  : 'bg-blue-700/40 border-blue-500 text-blue-200 hover:bg-blue-600/60'
+              } transition`}
+            >
+              <Star className="h-3 w-3" />
+              {skill}
+            </button>
+          );
+        })}
       </div>
     );
   };
