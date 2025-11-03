@@ -256,9 +256,33 @@ const handleConnect = async (target: any) => {
                 </CardHeader>
                 <CardContent>
                   {renderSkills(person)}
-                 <p className="text-gray-500 text-sm mt-3">
-  {person.bio?.trim() || 'No bio available.'}
-</p>
+                 {/* 🧠 Bio preview with truncation */}
+{person.bio ? (
+  <p
+    className="text-gray-500 text-sm mt-3 cursor-pointer hover:text-gray-300 transition"
+    title={person.bio} // full text on hover
+    onClick={(e) => {
+      const p = e.currentTarget;
+      if (p.dataset.expanded === "true") {
+        p.innerText =
+          person.bio.length > 100
+            ? person.bio.slice(0, 100).trim() + "..."
+            : person.bio;
+        p.dataset.expanded = "false";
+      } else {
+        p.innerText = person.bio.trim();
+        p.dataset.expanded = "true";
+      }
+    }}
+  >
+    {person.bio.length > 100
+      ? person.bio.slice(0, 100).trim() + "..."
+      : person.bio}
+  </p>
+) : (
+  <p className="text-gray-600 text-sm mt-3 italic">No bio available.</p>
+)}
+
 
                   {status === 'none' ? (
                     <Button
