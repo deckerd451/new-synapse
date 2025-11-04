@@ -1,22 +1,28 @@
-// src/pages/Onboarding.tsx
+// src/pages/OnboardingPage.tsx
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
-export function Onboarding() {
+export default function OnboardingPage() {
   const navigate = useNavigate();
 
   const handleContinue = () => {
-    // ✅ Redirect user to the Profile tab
-    navigate("/profile", { replace: true });
+    // ✅ Send new users to their profile tab in the app
+    navigate("/network?tab=profile", { replace: true });
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center text-center p-6 bg-background text-foreground">
+    <div className="min-h-screen flex flex-col items-center justify-center text-center px-6 bg-background text-foreground">
       <h1 className="text-4xl font-bold text-gold mb-4">🎉 Welcome to Synapse!</h1>
-      <p className="text-lg text-muted-foreground max-w-lg mb-8">
-        You’re all set up with your account.  
-        Let’s complete your profile so the community can find and connect with you.
+      <p className="text-lg text-muted-foreground max-w-md mb-8">
+        Your account has been created successfully.  
+        Let’s finish setting up your profile so others can connect with you.
       </p>
       <Button
         className="bg-gold text-background font-bold hover:bg-gold/90 transition-all"
         onClick={handleContinue}
+      >
+        Continue to Profile
+      </Button>
+    </div>
+  );
+}
