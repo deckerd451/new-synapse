@@ -4,10 +4,10 @@ import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
 
 function isComplete(row: any) {
-  // Option A: derived completeness
+  // Derived completeness check (customize as needed)
   const hasName = !!row?.name?.trim();
   const hasSkills = !!(row?.skills && String(row.skills).trim());
-  return hasName && hasSkills; // tweak for your needs
+  return hasName && hasSkills;
 }
 
 export function OnboardingGate({ children }: { children: React.ReactNode }) {
@@ -22,27 +22,29 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // ✅ Use 'id' instead of 'user_id' — matches your community table schema
       const { data, error } = await supabase
         .from("community")
         .select("id, name, skills, image_url, profile_completed")
-        .eq("user_id", user.id)
+        .eq("id", user.id)
         .maybeSingle();
 
       if (error) {
-        console.error(error);
+        console.error("Error checking onboarding status:", error);
         navigate("/login", { replace: true });
         return;
       }
 
-      const complete = typeof data?.profile_completed === "boolean"
-        ? data.profile_completed
-        : isComplete(data);
+      const complete =
+        typeof data?.profile_completed === "boolean"
+          ? data.profile_completed
+          : isComplete(data);
 
       if (!complete) navigate("/onboarding", { replace: true });
       else setChecking(false);
     })();
   }, [navigate]);
 
-  if (checking) return null; // or a spinner
+  if (checking) return null; // Could also return a loading spinner
   return <>{children}</>;
 }
