@@ -33,8 +33,9 @@ signIn: async (email) => {
 
     // ✅ Compute the proper redirect URL
   const redirectUrl = import.meta.env.DEV
-  ? "http://localhost:5173/#/"
-  : "https://deckerd451.github.io/new-synapse/#/";
+  ? "http://localhost:5173/"
+  : "https://deckerd451.github.io/new-synapse/";
+
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
