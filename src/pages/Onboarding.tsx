@@ -1,4 +1,4 @@
-// src/pages/OnboardingPage.tsx
+// src/pages/Onboarding.tsx
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
@@ -6,8 +6,7 @@ export default function OnboardingPage() {
   const navigate = useNavigate();
 
   const handleContinue = () => {
-    // ✅ Send new users to their profile tab in the app
-    navigate("/network?tab=profile", { replace: true });
+    navigate("/network?tab=profile", { replace: true }); // ✅ sends them to HomePage with profile tab open
   };
 
   return (
