@@ -2,7 +2,7 @@
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthWatcher } from "@/components/AuthWatcher";
 import OnboardingPage from "@/pages/OnboardingPage";
-import LoginPage from "@/pages/AuthPage";
+import { Login } from "@/components/auth/Login";
 import HomePage from "@/pages/HomePage";
 import { OnboardingGate } from "@/components/OnboardingGate";
 
