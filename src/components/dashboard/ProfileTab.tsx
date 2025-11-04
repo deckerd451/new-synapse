@@ -70,65 +70,59 @@ export function ProfileTab() {
       .join(", ");
   };
 
-  // 🧭 Handle form submit
-  const onSubmit = async (data: ProfileFormValues) => {
-    if (!profile) return;
-    setLoading(true);
+// 🧭 Handle form submit
+const onSubmit = async (data: ProfileFormValues) => {
+  if (!profile) return;
+  setLoading(true);
 
-    try {
-      await ensureCommunityUser();
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user;
+  try {
+    await ensureCommunityUser();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
 
-      const updates = {
-        name: data.name,
-        bio: typeof data.bio === "string" ? data.bio.trim() : "",
-        skills: cleanSkills(data.skills),
-        updated_at: new Date().toISOString(),
-        user_id: user?.id || profile.user_id,
-        email: profile.email || user?.email || "",
-      };
+    // 🧩 Normalize and build update payload
+    const cleanSkillsValue = cleanSkills(data.skills);
+    const nowComplete =
+      data.name.trim().length > 1 && cleanSkillsValue.trim().length > 0;
 
-      const { data: updatedProfile, error } = await supabase
-        .from("community")
-        .update(updates)
-        .eq("id", profile.id)
-        .select(
-          "id, name, email, bio, skills, image_url, user_id, updated_at, profile_completed"
-        )
-        .single();
+    const updates = {
+      name: data.name.trim(),
+      bio: typeof data.bio === "string" ? data.bio.trim() : "",
+      skills: cleanSkillsValue,
+      profile_completed: nowComplete, // ✅ auto-mark complete
+      updated_at: new Date().toISOString(),
+      user_id: user?.id || profile.user_id,
+      email: profile.email || user?.email || "",
+    };
 
-      if (error) throw error;
-      setProfile(updatedProfile);
-      toast.success("✅ Profile updated successfully!");
+    const { data: updatedProfile, error } = await supabase
+      .from("community")
+      .update(updates)
+      .eq("user_id", user?.id || profile.user_id)
+      .select(
+        "id, name, email, bio, skills, image_url, user_id, updated_at, profile_completed"
+      )
+      .single();
 
-      // ✅ NEW: Mark profile as completed if key fields are filled
-      const nowComplete =
-        (updates.name && updates.name.trim().length > 1) &&
-        (updates.skills && updates.skills.trim().length > 0);
+    if (error) throw error;
 
-      if (nowComplete) {
-        await supabase
-          .from("community")
-          .update({
-            profile_completed: true,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", profile.id);
+    // ✅ Immediately sync Zustand store so UI reflects updates
+    setProfile(updatedProfile);
+    toast.success("✅ Profile updated successfully!");
 
-        // ✅ Redirect only if this is first time completing profile
-        if (!profile.profile_completed) {
-          toast.success("🎉 Profile complete! Redirecting you to the network...");
-          setTimeout(() => navigate("/network"), 1500);
-        }
-      }
-    } catch (err: any) {
-      console.error("Error updating profile:", err);
-      toast.error(err.message || "Failed to update profile.");
-    } finally {
-      setLoading(false);
+    // 🎉 If this is their first time completing setup, auto-redirect
+    if (!profile.profile_completed && nowComplete) {
+      toast.success("🎉 Profile complete! Redirecting you to the network...");
+      setTimeout(() => navigate("/network"), 1500);
     }
-  };
+  } catch (err: any) {
+    console.error("Error updating profile:", err);
+    toast.error(err.message || "Failed to update profile.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // 🖼️ Crop image to square
   const cropToSquare = (file: File): Promise<Blob> =>
