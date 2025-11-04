@@ -26,7 +26,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setProfile: (profile) => set({ profile }),
 
 
- // ✉️ Magic link sign-in via Supabase (with proper redirect)
 // ✉️ Magic link sign-in via Supabase (with proper redirect)
 signIn: async (email) => {
   try {
@@ -34,8 +33,8 @@ signIn: async (email) => {
 
     // ✅ Compute the proper redirect URL
     const redirectUrl = import.meta.env.DEV
-      ? "http://localhost:5173/"
-      : "https://deckerd451.github.io/new-synapse/";
+  ? "http://localhost:5173/#/"
+  : "https://deckerd451.github.io/new-synapse/#/";
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
