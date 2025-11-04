@@ -12,7 +12,7 @@ export default function App() {
       <AuthWatcher />
       <Routes>
         <Route path="/" element={<Navigate to="/network" replace />} />
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
         <Route
           path="/network"
