@@ -11,17 +11,20 @@ export default function App() {
     <HashRouter>
       <AuthWatcher />
       <Routes>
-  <Route path="/" element={<Navigate to="/network" replace />} />
-  <Route path="/login" element={<Login />} />
-  <Route path="/onboarding" element={<OnboardingPage />} />
-  <Route
-    path="/network"
-    element={
-      <OnboardingGate>
-        <HomePage />
-      </OnboardingGate>
-    }
-  />
-  {/* 👇 add this fallback */}
-  <Route path="*" element={<Navigate to="/login" replace />} />
-</Routes>
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route
+          path="/network"
+          element={
+            <OnboardingGate>
+              <HomePage />
+            </OnboardingGate>
+          }
+        />
+        {/* 👇 add this explicit fallback route */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </HashRouter>
+  );
+}
