@@ -32,7 +32,7 @@ signIn: async (email) => {
     set({ loading: true });
 
     // ✅ Compute the proper redirect URL
-    const redirectUrl = import.meta.env.DEV
+  const redirectUrl = import.meta.env.DEV
   ? "http://localhost:5173/#/"
   : "https://deckerd451.github.io/new-synapse/#/";
 
