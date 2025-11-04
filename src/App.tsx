@@ -1,30 +1,28 @@
-// src/App.tsx (or routes file)
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+// src/App.tsx
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthWatcher } from "@/components/AuthWatcher";
 import OnboardingPage from "@/pages/OnboardingPage";
-import LoginPage from "@/pages/AuthPage";        // create or reuse
+import LoginPage from "@/pages/AuthPage";
 import HomePage from "@/pages/HomePage";
 import { OnboardingGate } from "@/components/OnboardingGate";
 
 export default function App() {
   return (
-    <BrowserRouter basename="/new-synapse"> {/* important for GitHub Pages subpath */}
+    <HashRouter>
       <AuthWatcher />
       <Routes>
         <Route path="/" element={<Navigate to="/network" replace />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
-       <Route
-  path="/network"
-  element={
-    <OnboardingGate>
-      <HomePage />   {/* ✅ replace NetworkPage with HomePage */}
-    </OnboardingGate>
-  }
-/>
- {/* settings page can reuse ProfileTab without the welcome wrapper */}
-{/* <Route path="/settings/profile" element={<ProfileSettingsPage />} /> */}
+        <Route
+          path="/network"
+          element={
+            <OnboardingGate>
+              <HomePage />
+            </OnboardingGate>
+          }
+        />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
