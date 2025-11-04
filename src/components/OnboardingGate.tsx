@@ -22,12 +22,13 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // ✅ Use 'id' instead of 'user_id' — matches your community table schema
-      const { data, error } = await supabase
-        .from("community")
-        .select("id, name, skills, image_url, profile_completed")
-        .eq("id", user.id)
-        .maybeSingle();
+    // ✅ Fetch community record using user_id or id for legacy compatibility
+const { data, error } = await supabase
+  .from("community")
+  .select("id, name, skills, image_url, profile_completed")
+  .or(`user_id.eq.${user.id},id.eq.${user.id}`)
+  .maybeSingle();
+
 
       if (error) {
         console.error("Error checking onboarding status:", error);
