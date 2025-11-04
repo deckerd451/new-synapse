@@ -10,7 +10,8 @@ export default function App() {
   return (
     <HashRouter>
       <AuthWatcher />
-      <Routes>
+      <Route path="*" element={<Navigate to="/login" replace />} />
+       <Routes>
         <Route path="/" element={<Navigate to="/network" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
