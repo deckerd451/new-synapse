@@ -1,10 +1,17 @@
+// src/components/auth/Login.tsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Toaster } from "@/components/ui/sonner";
 import { Mail, Loader2 } from "lucide-react";
 
@@ -16,11 +23,14 @@ export function Login() {
 
   // 🧠 Redirect if already signed in
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
       if (data.session?.user) {
-        navigate("/onboarding", { replace: true });
+        // ✅ Prefer routing through the app’s onboarding gate
+        navigate("/network", { replace: true });
       }
-    });
+    };
+    checkSession();
   }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -34,7 +44,9 @@ export function Login() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="w-full max-w-sm bg-background/80 backdrop-blur-sm border-gold/20">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold text-gold font-display">Synapse Link</CardTitle>
+          <CardTitle className="text-3xl font-bold text-gold font-display">
+            Synapse Link
+          </CardTitle>
           <CardDescription>
             Enter the network. Provide an email to sign in or create an account.
           </CardDescription>
