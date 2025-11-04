@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthWatcher } from "@/components/AuthWatcher";
 import OnboardingPage from "@/pages/OnboardingPage";
 import LoginPage from "@/pages/AuthPage";        // create or reuse
-import NetworkPage from "@/pages/NetworkPage";    // existing
+import HomePage from "@/pages/HomePage";
 import { OnboardingGate } from "@/components/OnboardingGate";
 
 export default function App() {
