@@ -10,8 +10,7 @@ export default function App() {
   return (
     <HashRouter>
       <AuthWatcher />
-      <Route path="*" element={<Navigate to="/login" replace />} />
-       <Routes>
+      <Routes>
         <Route path="/" element={<Navigate to="/network" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
@@ -23,6 +22,8 @@ export default function App() {
             </OnboardingGate>
           }
         />
+        {/* 🆕 Catch-all fallback for GH Pages */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </HashRouter>
   );
