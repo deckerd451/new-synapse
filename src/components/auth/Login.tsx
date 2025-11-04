@@ -1,26 +1,43 @@
-import { useState } from 'react';
-import { useAuthStore } from '@/stores/authStore';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Toaster } from '@/components/ui/sonner';
-import { Mail, Loader2 } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabaseClient";
+import { useAuthStore } from "@/stores/authStore";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Toaster } from "@/components/ui/sonner";
+import { Mail, Loader2 } from "lucide-react";
+
 export function Login() {
-  const [email, setEmail] = useState('');
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const signIn = useAuthStore((s) => s.signIn);
+
+  // 🧠 Redirect if already signed in
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session?.user) {
+        navigate("/onboarding", { replace: true });
+      }
+    });
+  }, [navigate]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     await signIn(email);
     setLoading(false);
   };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <Card className="w-full max-w-sm bg-background/80 backdrop-blur-sm border-gold/20">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold text-gold font-display">Synapse Link</CardTitle>
-          <CardDescription>Enter the network. Provide an email to sign in or create an account.</CardDescription>
+          <CardDescription>
+            Enter the network. Provide an email to sign in or create an account.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
@@ -37,8 +54,18 @@ export function Login() {
                 disabled={loading}
               />
             </div>
-            <Button type="submit" className="w-full bg-gold text-background hover:bg-gold/90 font-bold" disabled={loading}>
-              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Authenticating...</> : 'Sign In / Register'}
+            <Button
+              type="submit"
+              className="w-full bg-gold text-background hover:bg-gold/90 font-bold"
+              disabled={loading}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Authenticating...
+                </>
+              ) : (
+                "Sign In / Register"
+              )}
             </Button>
           </form>
         </CardContent>
