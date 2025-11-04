@@ -14,16 +14,16 @@ export default function App() {
         <Route path="/" element={<Navigate to="/network" replace />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/onboarding" element={<OnboardingPage />} />
-        <Route
-          path="/network"
-          element={
-            <OnboardingGate>
-              <NetworkPage />
-            </OnboardingGate>
-          }
-        />
-        {/* settings page can reuse ProfileTab without the welcome wrapper */}
-        {/* <Route path="/settings/profile" element={<ProfileSettingsPage />} /> */}
+       <Route
+  path="/network"
+  element={
+    <OnboardingGate>
+      <HomePage />   {/* ✅ replace NetworkPage with HomePage */}
+    </OnboardingGate>
+  }
+/>
+ {/* settings page can reuse ProfileTab without the welcome wrapper */}
+{/* <Route path="/settings/profile" element={<ProfileSettingsPage />} /> */}
       </Routes>
     </BrowserRouter>
   );
