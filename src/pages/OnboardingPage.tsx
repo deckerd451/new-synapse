@@ -11,21 +11,22 @@ export default function OnboardingPage() {
   useEffect(() => {
     let cancelled = false;
     let attempts = 0;
-    const maxAttempts = 6;
+    const maxAttempts = 10;
     const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
     console.log("🧭 OnboardingPage mounted — verifying user session…");
 
-    const checkSession = async () => {
+    const verifySession = async () => {
       if (cancelled) return;
-      const { data, error } = await supabase.auth.getSession();
 
+      const { data, error } = await supabase.auth.getSession();
       if (error) {
         console.error("❌ getSession error:", error.message);
         setStatus("error");
         return;
       }
 
+      // ✅ Found session in memory
       if (data?.session?.user) {
         console.log("✅ Session found:", data.session.user.email);
         setStatus("ready");
@@ -33,36 +34,42 @@ export default function OnboardingPage() {
         return;
       }
 
+      // 🧩 Fallback: Try direct getUser (bypasses localStorage lag)
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userData?.user) {
+        console.log("🧩 Session restored via getUser:", userData.user.email);
+        setStatus("ready");
+        navigate("/network", { replace: true });
+        return;
+      }
+
       attempts++;
       if (attempts <= maxAttempts) {
-        console.log(`⏳ Waiting for Supabase session… (${attempts}/${maxAttempts})`);
-        await delay(500 * attempts); // progressive backoff
-        await checkSession();
+        console.warn(`⏳ Waiting for Supabase session… (${attempts}/${maxAttempts})`);
+        await delay(700 * attempts); // exponential backoff
+        await verifySession();
       } else {
-        console.warn("⚠️ Still no session after retries — listening for auth events.");
-        setStatus("waiting");
+        console.error("❌ No session detected after retries.");
+        setStatus("error");
       }
     };
 
-    checkSession();
+    verifySession();
 
-    // 🎧 Auth state change listener
+    // 🎧 Auth state listener (handles async hydration)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       console.log("🧩 Auth event detected:", event);
 
-      if (event === "SIGNED_IN" && session?.user) {
-        console.log("✅ Authenticated user:", session.user.email);
+      if (session?.user && (event === "SIGNED_IN" || event === "INITIAL_SESSION")) {
+        console.log("✅ Authenticated via event:", session.user.email);
         setStatus("ready");
         navigate("/network", { replace: true });
       } else if (event === "SIGNED_OUT") {
-        console.warn("👋 Signed out — redirecting to /login");
+        console.warn("👋 Signed out — redirecting to login.");
         setStatus("error");
         navigate("/login", { replace: true });
-      } else if (event === "INITIAL_SESSION" && !session) {
-        console.log("⚠️ INITIAL_SESSION fired without user — retrying hydration.");
-        checkSession();
       }
     });
 
@@ -72,22 +79,20 @@ export default function OnboardingPage() {
     };
   }, [navigate]);
 
-  // 💫 Loading screen while waiting for session
+  // 🌀 Loading state
   if (status === "checking" || status === "waiting") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-        <p className="text-lg animate-pulse">
-          Waiting for authentication...
-        </p>
+        <p className="text-lg animate-pulse">Authenticating your session...</p>
       </div>
     );
   }
 
-  // 🧱 Fallback onboarding UI (if session confirmed)
+  // ✅ Displayed only briefly before redirect
   if (status === "ready") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center text-center p-6 bg-background text-foreground">
-        <h1 className="text-4xl font-bold text-gold mb-2">🎉 Welcome to Synapse!</h1>
+        <h1 className="text-4xl font-bold text-gold mb-2">Welcome to Synapse!</h1>
         <p className="text-lg text-muted-foreground max-w-md">
           Your account has been created successfully. Let’s finish setting up your profile
           so others can connect with you.
@@ -96,7 +101,7 @@ export default function OnboardingPage() {
     );
   }
 
-  // ❌ Error or signed out
+  // 🚫 Error state
   return (
     <div className="min-h-screen flex flex-col items-center justify-center text-center p-6 bg-background text-foreground">
       <h1 className="text-3xl font-bold text-red-400 mb-2">Session Expired</h1>
