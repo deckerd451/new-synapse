@@ -1,35 +1,60 @@
-// src/lib/ensureCommunityUser.ts
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabase";
 
+/**
+ * 🧩 Ensures that the authenticated user has a corresponding row
+ * in the "community" table.
+ *
+ * Creates one automatically if it doesn't exist.
+ * Returns the full community record.
+ */
 export async function ensureCommunityUser() {
-  const { data: { user }, error: authErr } = await supabase.auth.getUser();
-  if (authErr || !user) return null;
+  try {
+    // 🔐 Get current user session
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-  // Do we already have a row?
-  const { data: existing, error: selErr } = await supabase
-    .from("community")
-    .select("id")
-    .eq("user_id", user.id)
-    .maybeSingle();
+    if (authError) throw authError;
+    if (!user) {
+      console.warn("⚠️ No authenticated user found.");
+      return null;
+    }
 
-  if (selErr) {
-    console.error("ensureCommunityUser select error", selErr);
-    return user;
-  }
+    // 🧠 Check if a community profile already exists
+    const { data: existing, error: fetchError } = await supabase
+      .from("community")
+      .select("*")
+      .eq("email", user.email)
+      .maybeSingle();
 
-  if (!existing) {
-    const insert = {
-      user_id: user.id,
+    if (fetchError) throw fetchError;
+
+    if (existing) {
+      console.log("✅ Found existing community profile:", existing);
+      return existing;
+    }
+
+    // 🧱 Create a new record if one doesn’t exist
+    const newProfile = {
+      name: user.user_metadata?.full_name || user.email?.split("@")[0],
       email: user.email,
-      name: user.user_metadata?.full_name || "",
+      user_id: user.id,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      // optional new flag (see Step 4 SQL)
-      profile_completed: false,
     };
-    const { error: insErr } = await supabase.from("community").insert(insert);
-    if (insErr) console.error("ensureCommunityUser insert error", insErr);
-  }
 
-  return user;
+    const { data: inserted, error: insertError } = await supabase
+      .from("community")
+      .insert([newProfile])
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    console.log("🆕 Created new community profile:", inserted);
+    return inserted;
+  } catch (err) {
+    console.error("❌ ensureCommunityUser failed:", err);
+    return null;
+  }
 }
