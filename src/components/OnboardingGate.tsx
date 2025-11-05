@@ -9,58 +9,65 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const setProfile = useAuthStore((s) => s.setProfile);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    const checkProfile = async () => {
+    const init = async () => {
       try {
-        const { data: auth } = await supabase.auth.getUser();
-        const user = auth?.user;
+        console.log("🔍 Checking Supabase session...");
 
-        if (!user) {
-          console.warn("🚪 No authenticated user — redirecting to login");
+        // Wait for session to hydrate
+        const { data: sessionData } = await supabase.auth.getSession();
+        const session = sessionData?.session;
+
+        if (!session?.user) {
+          console.warn("⚠️ No active user, redirecting to login");
           navigate("/login", { replace: true });
           return;
         }
 
-        // ✅ Fetch from community table by email
+        const userEmail = session.user.email!;
+        console.log("✅ Authenticated user:", userEmail);
+
+        // Fetch from community
         const { data: community, error } = await supabase
           .from("community")
-          .select("id, email, profile_completed, name")
-          .eq("email", user.email)
+          .select("id, email, name, profile_completed")
+          .eq("email", userEmail)
           .single();
 
         if (error) {
-          console.error("❌ Error fetching community record:", error);
+          console.error("❌ Error fetching community:", error);
           navigate("/onboarding", { replace: true });
           return;
         }
 
-        // Store in global state for later use
         setProfile(community);
 
         if (community.profile_completed) {
-          console.log("✅ Profile completed — showing app");
+          console.log("✅ Profile completed — showing /network");
           navigate("/network", { replace: true });
         } else {
           console.log("🧩 Incomplete profile — redirecting to onboarding");
           navigate("/onboarding", { replace: true });
         }
       } catch (err) {
-        console.error("⚠️ Error in OnboardingGate:", err);
+        console.error("⚠️ OnboardingGate error:", err);
         navigate("/login", { replace: true });
       } finally {
+        setInitialized(true);
         setLoading(false);
       }
     };
 
-    checkProfile();
+    init();
   }, [navigate, setProfile]);
 
-  if (loading) {
+  if (loading || !initialized) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground">
         <Loader2 className="h-8 w-8 animate-spin text-gold mb-4" />
-        <p>Loading your profile...</p>
+        <p>Verifying your session...</p>
       </div>
     );
   }
