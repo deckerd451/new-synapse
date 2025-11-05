@@ -4,7 +4,7 @@ import { Login } from "@/components/auth/Login";
 import HomePage from "@/pages/HomePage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import { OnboardingGate } from "@/components/OnboardingGate";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabaseClient";
 import { ensureCommunityUser } from "@/lib/ensureCommunityUser";
 
 export default function App() {
