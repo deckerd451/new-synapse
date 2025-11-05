@@ -22,17 +22,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ✅ Use Node 20 for stable Vite + Supabase builds
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
 
+      # ✅ Use npm install instead of npm ci to fix rollup native binary bug
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
+      # ✅ Build your Vite project
       - name: Build Vite site
         run: npm run build
 
+      # ✅ Upload the built app (dist folder)
       - name: Upload build output
         uses: actions/upload-pages-artifact@v3
         with:
@@ -44,7 +49,16 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
+      # ✅ Deploy built app to GitHub Pages
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # 🧹 Optional: Clear GitHub Pages cache to prevent stale assets
+      - name: Clear GitHub Pages cache (optional)
+        if: always()
+        run: |
+          echo "Clearing cache to ensure fresh assets..."
+          curl -X PURGE "https://deckerd451.github.io/new-synapse/"
