@@ -1,10 +1,25 @@
 // /assets/js/supabaseClient.js
 import { createClient } from "@supabase/supabase-js";
 
-// 🧠 Initialize Supabase
+// ✅ Initialize Supabase with explicit CORS-safe settings
 export const supabase = createClient(
-  "https://hvmotpzhliufzomewzfl.supabase.co", // ✅ your Supabase URL
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh2bW90cHpobGl1ZnpvbWV3emZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI1NzY2NDUsImV4cCI6MjA1ODE1MjY0NX0.foHTGZVtRjFvxzDfMf1dpp0Zw4XFfD-FPZK-zRnjc6s"
+  "https://hvmotpzhliufzomewzfl.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh2bW90cHpobGl1ZnpvbWV3emZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI1NzY2NDUsImV4cCI6MjA1ODE1MjY0NX0.foHTGZVtRjFvxzDfMf1dpp0Zw4XFfD-FPZK-zRnjc6s",
+  {
+    global: {
+      fetch: (input, init = {}) =>
+        fetch(input, {
+          ...init,
+          mode: "cors", // ✅ allows proper JSON responses from Supabase
+          credentials: "omit",
+        }),
+    },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      flowType: "pkce",
+    },
+  }
 );
 
 // 🧩 Ensures that the current authenticated user has a matching row
