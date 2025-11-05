@@ -1,4 +1,3 @@
-// src/pages/OnboardingPage.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
@@ -11,7 +10,7 @@ export default function OnboardingPage() {
   useEffect(() => {
     console.log("🧭 OnboardingPage mounted — verifying user session…");
 
-    // Check immediately first
+    // 1️⃣ Immediate check on mount
     supabase.auth.getSession().then(({ data }) => {
       if (data.session?.user) {
         console.log("✅ Session already active:", data.session.user.email);
@@ -22,15 +21,39 @@ export default function OnboardingPage() {
       setChecking(false);
     });
 
-    // Listen for Supabase auth events (works even if delayed)
+    // 2️⃣ Persistent listener for delayed hydration
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("🧩 Auth state changed:", event);
+
       if (session?.user) {
         console.log("✅ Authenticated user:", session.user.email);
         navigate("/network", { replace: true });
-      } else if (event === "SIGNED_OUT") {
+        return;
+      }
+
+      // 🩹 SAFARI + GH PAGES FIX:
+      // INITIAL_SESSION sometimes fires before Supabase restores user in localStorage.
+      if (event === "INITIAL_SESSION" && !session?.user) {
+        console.warn("⚠️ No user in INITIAL_SESSION — checking manually…");
+        const { data: userResult, error } = await supabase.auth.getUser();
+
+        if (error) {
+          console.error("❌ getUser() error:", error.message);
+          return;
+        }
+
+        if (userResult?.user) {
+          console.log("✅ getUser() recovered:", userResult.user.email);
+          navigate("/network", { replace: true });
+          return;
+        }
+
+        console.warn("🚫 Still no user after getUser() check");
+      }
+
+      if (event === "SIGNED_OUT") {
         console.warn("👋 Signed out — redirecting to /login");
         navigate("/login", { replace: true });
       }
@@ -39,6 +62,7 @@ export default function OnboardingPage() {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  // 3️⃣ Simple loader while verifying session
   if (checking) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
@@ -47,6 +71,7 @@ export default function OnboardingPage() {
     );
   }
 
+  // 4️⃣ Default welcome screen
   return (
     <div className="min-h-screen flex flex-col items-center justify-center text-center p-6 bg-background text-foreground">
       <h1 className="text-4xl font-bold text-gold mb-2">🎉 Welcome to Synapse!</h1>
