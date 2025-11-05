@@ -8,22 +8,22 @@ import App from "./App";
 import "@/index.css";
 import { Toaster } from "@/components/ui/sonner";
 
-// ✅ Import Supabase client
-import { supabase } from "@/lib/supabase"; // Ensure this path is correct!
+// ✅ Import from the correct Supabase file (supabase.ts)
+import { supabase } from "@/lib/supabase";
 
-// ✅ Expose globally so window.supabase.from() works anywhere
+// ✅ Expose globally for console testing and older scripts
 window.supabase = supabase;
+console.log("🧠 Supabase initialized:", window.supabase);
 
-// ✅ Apply dark mode theme globally
+// ✅ Apply dark theme globally
 document.documentElement.classList.add("dark");
 
 window.addEventListener("DOMContentLoaded", () => {
   const root = document.getElementById("root");
-
   if (root) {
     createRoot(root).render(
       <StrictMode>
-        <App /> {/* Uses your router from App.tsx */}
+        <App /> {/* ✅ Uses your router from App.tsx */}
         <Toaster theme="dark" richColors closeButton />
       </StrictMode>
     );
