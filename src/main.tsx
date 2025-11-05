@@ -4,21 +4,22 @@ enableMapSet();
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { HashRouter } from "react-router-dom";
 import App from "./App";
 import "@/index.css";
 import { Toaster } from "@/components/ui/sonner";
-
-// ✅ Import from the correct Supabase file (supabase.ts)
 import { supabase } from "@/lib/supabaseClient";
-console.log("🧩 Import check — supabase:", supabase);
-console.log("🧩 Env check:", import.meta.env.VITE_SUPABASE_URL);
 
-
-// ✅ Expose globally for console testing and older scripts
 window.supabase = supabase;
 console.log("🧠 Supabase initialized:", window.supabase);
 
-// ✅ Apply dark theme globally
+// ✅ Ensure we’re always using a hash URL for GitHub Pages
+if (!window.location.hash) {
+  console.warn("⚠️ No hash detected — redirecting to #/login");
+  window.location.replace(window.location.href + "#/login");
+}
+
+// ✅ Apply dark mode globally
 document.documentElement.classList.add("dark");
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -26,8 +27,10 @@ window.addEventListener("DOMContentLoaded", () => {
   if (root) {
     createRoot(root).render(
       <StrictMode>
-        <App /> {/* ✅ Uses your router from App.tsx */}
-        <Toaster theme="dark" richColors closeButton />
+        <HashRouter>
+          <App />
+          <Toaster theme="dark" richColors closeButton />
+        </HashRouter>
       </StrictMode>
     );
     console.log("✅ React app mounted successfully (App router)");
