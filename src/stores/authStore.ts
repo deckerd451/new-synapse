@@ -32,26 +32,28 @@ signIn: async (email) => {
     set({ loading: true });
 
     // ✅ Compute the proper redirect URL
-  const redirectUrl = import.meta.env.DEV
-  ? "http://localhost:5173/"
-  : "https://deckerd451.github.io/new-synapse/";
+    const redirectUrl = import.meta.env.DEV
+      ? "http://localhost:5173/#/onboarding"
+      : "https://deckerd451.github.io/new-synapse/#/onboarding";
 
+    console.log("📧 Sending magic link redirecting to:", redirectUrl);
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: {
-        emailRedirectTo: redirectUrl,
-      },
+      options: { emailRedirectTo: redirectUrl },
     });
 
     if (error) throw error;
+
     toast.success("Magic link sent! Check your email to log in.");
   } catch (error: any) {
+    console.error("❌ Login failed:", error.message);
     toast.error(error.message || "Login failed.");
   } finally {
     set({ loading: false });
   }
 },
+
 
 
   // 🔍 Check current session
