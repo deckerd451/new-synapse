@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useNavigate, HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useNavigate, Routes, Route, Navigate } from "react-router-dom";
 import { Login } from "@/components/auth/Login";
 import HomePage from "@/pages/HomePage";
 import OnboardingPage from "@/pages/OnboardingPage";
@@ -13,12 +13,15 @@ export default function App() {
   useEffect(() => {
     console.log("🧠 Initializing Supabase auth listener...");
 
-    // 🧹 Clean up OAuth callback hash right away
-    if (window.location.hash.includes("access_token")) {
-      const url = window.location.origin + window.location.pathname;
-      window.history.replaceState({}, document.title, url);
-      console.log("🧹 Cleaned up Supabase OAuth hash from URL");
-    }
+    // 🧹 Clean up OAuth callback hash after Supabase redirect
+    // (delay ensures Supabase finishes injecting it)
+    setTimeout(() => {
+      if (window.location.hash.includes("access_token")) {
+        const cleanUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+        console.log("🧹 Cleaned up Supabase OAuth hash from URL");
+      }
+    }, 200);
 
     // 🔐 Listen for auth state changes
     const {
@@ -66,4 +69,4 @@ export default function App() {
   );
 }
 
-// ✅ Wrap in HashRouter at the root (in main.tsx)
+// ✅ Remember: HashRouter is wrapped at the root in main.tsx
