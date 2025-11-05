@@ -9,7 +9,7 @@ import "@/index.css";
 import { Toaster } from "@/components/ui/sonner";
 
 // ✅ Import from the correct Supabase file (supabase.ts)
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabaseClient";
 console.log("🧩 Import check — supabase:", supabase);
 console.log("🧩 Env check:", import.meta.env.VITE_SUPABASE_URL);
 
