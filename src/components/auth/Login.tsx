@@ -12,32 +12,53 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Toaster } from "@/components/ui/sonner";
-import { Mail, Loader2 } from "lucide-react";
+import { Toaster, toast } from "sonner";
+import { Mail } from "lucide-react";
 
 export function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const signIn = useAuthStore((s) => s.signIn);
 
   // 🧠 Redirect if already signed in
   useEffect(() => {
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session?.user) {
-        // ✅ Prefer routing through the app’s onboarding gate
+        console.log("✅ Existing session detected:", data.session.user.email);
         navigate("/network", { replace: true });
       }
     };
     checkSession();
   }, [navigate]);
 
+  // ✉️ Handle magic link login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    await signIn(email);
-    setLoading(false);
+
+    try {
+      console.log("📧 Sending magic link to:", email);
+
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          // ✅ Critical for GitHub Pages redirect
+          emailRedirectTo:
+            "https://deckerd451.github.io/new-synapse/#/onboarding",
+        },
+      });
+
+      if (error) throw error;
+
+      toast.success("Magic link sent! Check your inbox.");
+      setEmail("");
+    } catch (err: any) {
+      console.error("❌ Login error:", err);
+      toast.error(err.message || "Failed to send magic link.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -71,13 +92,7 @@ export function Login() {
               className="w-full bg-gold text-background hover:bg-gold/90 font-bold"
               disabled={loading}
             >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Authenticating...
-                </>
-              ) : (
-                "Sign In / Register"
-              )}
+              {loading ? "Sending magic link..." : "Sign In / Register"}
             </Button>
           </form>
         </CardContent>
