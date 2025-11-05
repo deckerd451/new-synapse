@@ -1,51 +1,69 @@
 // src/components/OnboardingGate.tsx
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
 import { useNavigate } from "react-router-dom";
-
-function isComplete(row: any) {
-  // Derived completeness check (customize as needed)
-  const hasName = !!row?.name?.trim();
-  const hasSkills = !!(row?.skills && String(row.skills).trim());
-  return hasName && hasSkills;
-}
+import { supabase } from "@/lib/supabaseClient";
 
 export function OnboardingGate({ children }: { children: React.ReactNode }) {
-  const [checking, setChecking] = useState(true);
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [allowed, setAllowed] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+    const verifyProfile = async () => {
+      try {
+        // 🔐 1. Ensure a logged-in user exists
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+          console.warn("⚠️ No user session found — redirecting to login.");
+          navigate("/login", { replace: true });
+          return;
+        }
+
+        // 🧩 2. Check if a profile exists in 'community' table
+        const { data, error } = await supabase
+          .from("community")
+          .select("id")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.error("❌ Error checking community profile:", error);
+          navigate("/login", { replace: true });
+          return;
+        }
+
+        if (!data) {
+          console.log("🆕 No profile found — redirecting to onboarding.");
+          navigate("/onboarding", { replace: true });
+          return;
+        }
+
+        // ✅ 3. User is onboarded
+        setAllowed(true);
+      } catch (err) {
+        console.error("❌ OnboardingGate failed:", err);
         navigate("/login", { replace: true });
-        return;
+      } finally {
+        setLoading(false);
       }
+    };
 
-    // ✅ Fetch community record using user_id or id for legacy compatibility
-const { data, error } = await supabase
-  .from("community")
-  .select("id, name, skills, image_url, profile_completed")
-  .or(`user_id.eq.${user.id},id.eq.${user.id}`)
-  .maybeSingle();
-
-
-      if (error) {
-        console.error("Error checking onboarding status:", error);
-        navigate("/login", { replace: true });
-        return;
-      }
-
-      const complete =
-        typeof data?.profile_completed === "boolean"
-          ? data.profile_completed
-          : isComplete(data);
-
-      if (!complete) navigate("/onboarding", { replace: true });
-      else setChecking(false);
-    })();
+    verifyProfile();
   }, [navigate]);
 
-  if (checking) return null; // Could also return a loading spinner
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-foreground">
+        <p>Loading your workspace...</p>
+      </div>
+    );
+  }
+
+  if (!allowed) return null; // prevents flicker while redirecting
+
   return <>{children}</>;
 }
