@@ -9,11 +9,17 @@ import { supabase } from "@/lib/supabase";
 import { ensureCommunityUser } from "@/lib/ensureCommunityUser";
 
 export default function App() {
-  // ✅ Run once on mount
   useEffect(() => {
     console.log("🧠 Initializing Supabase auth listener...");
 
-    // Listen for auth state changes (login/logout)
+    // 🧹 Clean up Supabase OAuth callback fragments (only once)
+    if (window.location.hash.includes("access_token")) {
+      const url = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, url);
+      console.log("🧹 Cleaned up Supabase OAuth hash from URL");
+    }
+
+    // 🔐 Listen for auth state changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -21,13 +27,12 @@ export default function App() {
 
       if (session?.user) {
         console.log("✅ User logged in:", session.user.email);
-        await ensureCommunityUser(); // creates or finds community profile
+        await ensureCommunityUser(); // ensures community profile
       } else if (event === "SIGNED_OUT") {
         console.log("👋 User signed out");
       }
     });
 
-    // Cleanup listener on unmount
     return () => {
       subscription.unsubscribe();
     };
