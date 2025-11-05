@@ -14,50 +14,60 @@ export default function App() {
   useEffect(() => {
     console.log("🧠 Initializing Supabase auth listener...");
 
-    // 🧹 Clean up OAuth hash after Supabase email redirect
+    // 🧹 Clean OAuth hash (if present)
     setTimeout(() => {
       if (window.location.hash.includes("access_token")) {
-        const cleanUrl = window.location.origin + window.location.pathname;
+        const cleanUrl =
+          window.location.origin + window.location.pathname + "#/";
         window.history.replaceState({}, document.title, cleanUrl);
-        console.log("🧹 Cleaned up Supabase OAuth hash from URL");
+        console.log("🧹 Cleaned Supabase OAuth hash from URL");
       }
-    }, 200);
+    }, 250);
 
-    // 🔐 Auth listener for login/logout events
+    // ✅ Only set up listener if Supabase is defined
+    if (!supabase) {
+      console.error("❌ Supabase client not initialized");
+      return;
+    }
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("🔄 Auth event:", event);
 
-      if (session?.user) {
-        console.log("✅ Logged in:", session.user.email);
-        await ensureCommunityUser();
+      try {
+        if (session?.user) {
+          console.log("✅ Logged in as:", session.user.email);
+          await ensureCommunityUser();
 
-        // 🚀 Redirect to network dashboard once logged in
-        navigate("/network", { replace: true });
-      } else if (event === "SIGNED_OUT") {
-        console.log("👋 Signed out");
-        navigate("/login", { replace: true });
+          // ⏳ Delay navigation slightly to ensure router is ready
+          setTimeout(() => navigate("/network", { replace: true }), 300);
+        } else if (event === "SIGNED_OUT") {
+          console.log("👋 Signed out");
+          setTimeout(() => navigate("/login", { replace: true }), 200);
+        }
+      } catch (err) {
+        console.error("⚠️ Auth listener error:", err);
       }
     });
 
     return () => {
-      subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
   }, [navigate]);
 
   return (
     <Routes>
-      {/* 🏁 Default route — redirect to login if no session */}
+      {/* Default route */}
       <Route path="/" element={<Navigate to="/login" replace />} />
 
-      {/* 🔐 Login page */}
+      {/* Login */}
       <Route path="/login" element={<Login />} />
 
-      {/* 🎯 Onboarding page */}
+      {/* Onboarding */}
       <Route path="/onboarding" element={<OnboardingPage />} />
 
-      {/* 🧠 Main network/dashboard, gated by onboarding */}
+      {/* Network (protected via OnboardingGate) */}
       <Route
         path="/network"
         element={
@@ -67,7 +77,7 @@ export default function App() {
         }
       />
 
-      {/* 🔁 Fallback for unknown routes */}
+      {/* Catch-all fallback */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
