@@ -9,7 +9,7 @@ import "@/index.css";
 import { Toaster } from "@/components/ui/sonner";
 
 // ✅ Import Supabase client
-import { supabase } from "@/lib/supabaseClient"; // Ensure this path is correct!
+import { supabase } from "@/lib/supabase"; // Ensure this path is correct!
 
 // ✅ Expose globally so window.supabase.from() works anywhere
 window.supabase = supabase;
