@@ -17,8 +17,10 @@ import {
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Upload, Check, X } from "lucide-react";
-import { supabase, ensureCommunityUser } from "@/lib/supabaseClient";
-import { useNavigate } from "react-router-dom"; // ✅ NEW: for redirect
+import { supabase } from "@/lib/supabaseClient";              // ✅ only Supabase client here
+import { ensureCommunityUser } from "@/lib/ensureCommunityUser"; // ✅ separate import for helper
+import { useNavigate } from "react-router-dom"; // ✅ navigation hook
+
 
 // 🧩 Schema
 const profileSchema = z.object({
