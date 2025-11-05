@@ -1,5 +1,17 @@
+# Node dependencies
 node_modules
-.env
-.dev.vars
+
+# Build output
 dist
 
+# Local-only environment files (never commit)
+.env
+.env.local
+.env.development
+.env.test
+
+# Cloudflare or local dev vars
+.dev.vars
+
+# ✅ DO NOT ignore production env (needed for GitHub Pages)
+# Keep `.env.production` in the repo so Vite can access it during build
