@@ -2,68 +2,68 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
+import { useAuthStore } from "@/stores/authStore";
+import { Loader2 } from "lucide-react";
 
 export function OnboardingGate({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
+  const setProfile = useAuthStore((s) => s.setProfile);
   const [loading, setLoading] = useState(true);
-  const [allowed, setAllowed] = useState(false);
 
   useEffect(() => {
-    const verifyProfile = async () => {
+    const checkProfile = async () => {
       try {
-        // 🔐 1. Ensure a logged-in user exists
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
+        const { data: auth } = await supabase.auth.getUser();
+        const user = auth?.user;
 
-        if (userError || !user) {
-          console.warn("⚠️ No user session found — redirecting to login.");
+        if (!user) {
+          console.warn("🚪 No authenticated user — redirecting to login");
           navigate("/login", { replace: true });
           return;
         }
 
-        // 🧩 2. Check if a profile exists in 'community' table
-        const { data, error } = await supabase
+        // ✅ Fetch from community table by email
+        const { data: community, error } = await supabase
           .from("community")
-          .select("id")
-          .eq("id", user.id)
-          .maybeSingle();
+          .select("id, email, profile_completed, name")
+          .eq("email", user.email)
+          .single();
 
         if (error) {
-          console.error("❌ Error checking community profile:", error);
-          navigate("/login", { replace: true });
-          return;
-        }
-
-        if (!data) {
-          console.log("🆕 No profile found — redirecting to onboarding.");
+          console.error("❌ Error fetching community record:", error);
           navigate("/onboarding", { replace: true });
           return;
         }
 
-        // ✅ 3. User is onboarded
-        setAllowed(true);
+        // Store in global state for later use
+        setProfile(community);
+
+        if (community.profile_completed) {
+          console.log("✅ Profile completed — showing app");
+          navigate("/network", { replace: true });
+        } else {
+          console.log("🧩 Incomplete profile — redirecting to onboarding");
+          navigate("/onboarding", { replace: true });
+        }
       } catch (err) {
-        console.error("❌ OnboardingGate failed:", err);
+        console.error("⚠️ Error in OnboardingGate:", err);
         navigate("/login", { replace: true });
       } finally {
         setLoading(false);
       }
     };
 
-    verifyProfile();
-  }, [navigate]);
+    checkProfile();
+  }, [navigate, setProfile]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-foreground">
-        <p>Loading your workspace...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground">
+        <Loader2 className="h-8 w-8 animate-spin text-gold mb-4" />
+        <p>Loading your profile...</p>
       </div>
     );
   }
-
-  if (!allowed) return null; // prevents flicker while redirecting
 
   return <>{children}</>;
 }
