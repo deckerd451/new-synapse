@@ -17,29 +17,26 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ✅ Use Node.js (not Bun) for predictable Vite builds
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      # ✅ Install all dependencies (including optional ones)
       - name: Install dependencies
         run: npm install
 
-      # ✅ Force Rollup to use JS fallback — fixes @rollup/rollup-linux-x64-gnu error
+      # 🩹 Force JS-only Rollup (avoids native binary bug)
+      - name: Downgrade Rollup to v3
+        run: npm install rollup@3 --save-exact
+
       - name: Build Vite site
         run: npm run build
-        env:
-          ROLLUP_USE_NODE_JS: 'true'
 
-      # ✅ Upload build output for Pages deployment
       - name: Upload build output
         uses: actions/upload-pages-artifact@v3
         with:
