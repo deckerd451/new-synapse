@@ -1,6 +1,5 @@
-// src/App.tsx
 import { useEffect } from "react";
-import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useNavigate, HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Login } from "@/components/auth/Login";
 import HomePage from "@/pages/HomePage";
 import OnboardingPage from "@/pages/OnboardingPage";
@@ -9,10 +8,12 @@ import { supabase } from "@/lib/supabase";
 import { ensureCommunityUser } from "@/lib/ensureCommunityUser";
 
 export default function App() {
+  const navigate = useNavigate();
+
   useEffect(() => {
     console.log("🧠 Initializing Supabase auth listener...");
 
-    // 🧹 Clean up Supabase OAuth callback fragments (only once)
+    // 🧹 Clean up OAuth callback hash right away
     if (window.location.hash.includes("access_token")) {
       const url = window.location.origin + window.location.pathname;
       window.history.replaceState({}, document.title, url);
@@ -27,40 +28,42 @@ export default function App() {
 
       if (session?.user) {
         console.log("✅ User logged in:", session.user.email);
-        await ensureCommunityUser(); // ensures community profile
+        await ensureCommunityUser();
+
+        // 🚀 Redirect authenticated users straight to the network page
+        navigate("/network", { replace: true });
       } else if (event === "SIGNED_OUT") {
         console.log("👋 User signed out");
+        navigate("/login", { replace: true });
       }
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   return (
-    <HashRouter>
-      <Routes>
-        {/* Default route */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+    <Routes>
+      {/* Default route */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
 
-        {/* ✅ Explicit login route */}
-        <Route path="/login" element={<Login />} />
+      {/* Login */}
+      <Route path="/login" element={<Login />} />
 
-        {/* Onboarding + main network */}
-        <Route path="/onboarding" element={<OnboardingPage />} />
-        <Route
-          path="/network"
-          element={
-            <OnboardingGate>
-              <HomePage />
-            </OnboardingGate>
-          }
-        />
+      {/* Onboarding + main network */}
+      <Route path="/onboarding" element={<OnboardingPage />} />
+      <Route
+        path="/network"
+        element={
+          <OnboardingGate>
+            <HomePage />
+          </OnboardingGate>
+        }
+      />
 
-        {/* ✅ Catch-all fallback */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </HashRouter>
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
   );
 }
+
+// ✅ Wrap in HashRouter at the root (in main.tsx)
