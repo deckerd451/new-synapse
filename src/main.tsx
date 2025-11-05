@@ -10,6 +10,9 @@ import { Toaster } from "@/components/ui/sonner";
 
 // ✅ Import from the correct Supabase file (supabase.ts)
 import { supabase } from "@/lib/supabase";
+console.log("🧩 Import check — supabase:", supabase);
+console.log("🧩 Env check:", import.meta.env.VITE_SUPABASE_URL);
+
 
 // ✅ Expose globally for console testing and older scripts
 window.supabase = supabase;
