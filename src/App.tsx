@@ -1,11 +1,12 @@
+// src/App.tsx
 import { useEffect } from "react";
-import { useNavigate, Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabaseClient";
+import { ensureCommunityUser } from "@/lib/ensureCommunityUser";
 import { Login } from "@/components/auth/Login";
 import HomePage from "@/pages/HomePage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import { OnboardingGate } from "@/components/OnboardingGate";
-import { supabase } from "@/lib/supabaseClient";
-import { ensureCommunityUser } from "@/lib/ensureCommunityUser";
 
 export default function App() {
   const navigate = useNavigate();
@@ -13,8 +14,7 @@ export default function App() {
   useEffect(() => {
     console.log("🧠 Initializing Supabase auth listener...");
 
-    // 🧹 Clean up OAuth callback hash after Supabase redirect
-    // (delay ensures Supabase finishes injecting it)
+    // 🧹 Clean up OAuth hash after Supabase email redirect
     setTimeout(() => {
       if (window.location.hash.includes("access_token")) {
         const cleanUrl = window.location.origin + window.location.pathname;
@@ -23,37 +23,41 @@ export default function App() {
       }
     }, 200);
 
-    // 🔐 Listen for auth state changes
+    // 🔐 Auth listener for login/logout events
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("🔄 Auth event:", event);
 
       if (session?.user) {
-        console.log("✅ User logged in:", session.user.email);
+        console.log("✅ Logged in:", session.user.email);
         await ensureCommunityUser();
 
-        // 🚀 Redirect authenticated users straight to the network page
+        // 🚀 Redirect to network dashboard once logged in
         navigate("/network", { replace: true });
       } else if (event === "SIGNED_OUT") {
-        console.log("👋 User signed out");
+        console.log("👋 Signed out");
         navigate("/login", { replace: true });
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   return (
     <Routes>
-      {/* Default route */}
+      {/* 🏁 Default route — redirect to login if no session */}
       <Route path="/" element={<Navigate to="/login" replace />} />
 
-      {/* Login */}
+      {/* 🔐 Login page */}
       <Route path="/login" element={<Login />} />
 
-      {/* Onboarding + main network */}
+      {/* 🎯 Onboarding page */}
       <Route path="/onboarding" element={<OnboardingPage />} />
+
+      {/* 🧠 Main network/dashboard, gated by onboarding */}
       <Route
         path="/network"
         element={
@@ -63,10 +67,8 @@ export default function App() {
         }
       />
 
-      {/* Fallback */}
+      {/* 🔁 Fallback for unknown routes */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
 }
-
-// ✅ Remember: HashRouter is wrapped at the root in main.tsx
