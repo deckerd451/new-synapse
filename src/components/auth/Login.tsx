@@ -4,6 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
+
+export function Login() {
+  useAuthGuard(false); // 🚪 Redirect logged-in users away from login
+  ...
+}
+
 
 export function Login() {
   const [mode, setMode] = useState<"login" | "signup" | "forgot" | "reset">("login");
