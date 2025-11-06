@@ -7,6 +7,7 @@ import OnboardingPage from "@/pages/OnboardingPage";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabaseClient";
 
+
 export default function App() {
   const { profile, loading, setProfile, checkUser } = useAuthStore();
 
@@ -56,6 +57,10 @@ export default function App() {
             profile ? <Navigate to="/network" replace /> : <Navigate to="/login" replace />
           }
         />
+        <Route path="/reset-password" 
+          element={<Login />} 
+          />
+
 
         <Route
           path="/login"
