@@ -10,38 +10,49 @@ import "@/index.css";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/lib/supabaseClient";
 
+// ✅ Expose Supabase globally for debugging
 window.supabase = supabase;
+console.log("🧠 Supabase initialized:", window.supabase);
+
+// ✅ Apply dark theme globally
 document.documentElement.classList.add("dark");
 
-// ✅ 1. Handle all Supabase redirects (magic link + GitHub OAuth)
+// ✅ Handle Supabase magic link & OAuth redirects
 (async () => {
   const hash = window.location.hash;
   const query = window.location.search;
 
-  // Supabase redirects can use hash (#) OR query (?)
-  const urlParams = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : query.slice(1));
+  // Supabase may return either #access_token or ?access_token
+  const urlParams = new URLSearchParams(
+    hash.startsWith("#") ? hash.slice(1) : query.slice(1)
+  );
 
   const access_token = urlParams.get("access_token");
   const refresh_token = urlParams.get("refresh_token");
 
   if (access_token && refresh_token) {
-    console.log("🔐 Restoring Supabase session from redirect tokens...");
+    console.log("🔐 Restoring Supabase session from redirect...");
     try {
       await supabase.auth.setSession({ access_token, refresh_token });
-      console.log("✅ Session restored successfully");
+      console.log("✅ Session restored successfully!");
     } catch (err) {
-      console.error("❌ Error restoring session:", err);
+      console.error("❌ Error restoring Supabase session:", err);
     }
 
-    // Clean up the URL
-    const cleanUrl = window.location.origin + window.location.pathname;
+    // 🧹 Clean up the URL (removes #access_token=... etc.)
+    const cleanUrl =
+      window.location.origin +
+      window.location.pathname +
+      "#/onboarding";
     window.history.replaceState({}, document.title, cleanUrl);
   }
 })();
 
-// ✅ 2. Mount React app
+// ✅ Wait for Supabase session hydration before mounting React
 window.addEventListener("DOMContentLoaded", async () => {
   console.log("🕒 Waiting for Supabase session hydration...");
+
+  // Small delay for localStorage sync
   await new Promise((res) => setTimeout(res, 300));
 
   const root = document.getElementById("root");
@@ -55,5 +66,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       </StrictMode>
     );
     console.log("✅ React app mounted successfully (HashRouter)");
+  } else {
+    console.error("❌ No #root element found!");
   }
 });
