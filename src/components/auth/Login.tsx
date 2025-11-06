@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
-import { useAuthStore } from "@/stores/authStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,12 +12,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Toaster, toast } from "sonner";
-import { Mail } from "lucide-react";
+import { Mail, Github } from "lucide-react";
 
 export function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // ✅ Use one redirect URL for both providers
+  const redirectUrl = "https://deckerd451.github.io/#/onboarding";
 
   // 🧠 Redirect if already signed in
   useEffect(() => {
@@ -33,30 +35,41 @@ export function Login() {
   }, [navigate]);
 
   // ✉️ Handle magic link login
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       console.log("📧 Sending magic link to:", email);
-
       const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: {
-          // ✅ Critical for GitHub Pages redirect
-          emailRedirectTo:
-            "https://deckerd451.github.io/new-synapse/#/onboarding",
-        },
+        options: { emailRedirectTo: redirectUrl },
       });
-
       if (error) throw error;
-
       toast.success("Magic link sent! Check your inbox.");
       setEmail("");
     } catch (err: any) {
       console.error("❌ Login error:", err);
       toast.error(err.message || "Failed to send magic link.");
     } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🧩 Handle GitHub OAuth
+  const handleGitHubLogin = async () => {
+    setLoading(true);
+    try {
+      console.log("🐙 Redirecting to GitHub OAuth...");
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "github",
+        options: { redirectTo: redirectUrl },
+      });
+      if (error) throw error;
+      // Supabase redirects automatically to GitHub then back to redirectUrl
+    } catch (err: any) {
+      console.error("❌ GitHub OAuth error:", err);
+      toast.error(err.message || "GitHub login failed.");
       setLoading(false);
     }
   };
@@ -69,11 +82,13 @@ export function Login() {
             Synapse Link
           </CardTitle>
           <CardDescription>
-            Enter the network. Provide an email to sign in or create an account.
+            Enter the network. Sign in with your email or GitHub account.
           </CardDescription>
         </CardHeader>
+
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+          {/* ✉️ Email login form */}
+          <form onSubmit={handleEmailLogin} className="space-y-4">
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
@@ -95,6 +110,25 @@ export function Login() {
               {loading ? "Sending magic link..." : "Sign In / Register"}
             </Button>
           </form>
+
+          {/* Divider */}
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-muted-foreground/30" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">or</span>
+            </div>
+          </div>
+
+          {/* 🐙 GitHub OAuth button */}
+          <Button
+            onClick={handleGitHubLogin}
+            className="w-full bg-[#24292F] hover:bg-[#1b1f23] text-white font-semibold flex items-center justify-center gap-2"
+            disabled={loading}
+          >
+            <Github className="h-5 w-5" /> Sign in with GitHub
+          </Button>
         </CardContent>
       </Card>
       <Toaster theme="dark" richColors />
