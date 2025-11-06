@@ -93,26 +93,26 @@ export default function App() {
     );
   }
 
-  // ✅ Router now simplified — no inline auth logic
+  // ✅ Router first, ErrorBoundary inside
   return (
-    <ErrorBoundary>
-      <HashRouter>
+    <HashRouter>
+      <ErrorBoundary>
         <Routes>
-          {/* Default route (redirects handled by guards) */}
+          {/* Default route */}
           <Route path="/" element={<Login />} />
 
-          {/* Public Auth routes */}
+          {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/reset-password" element={<Login />} />
 
-          {/* Protected routes (guards inside components) */}
+          {/* Protected routes (auth handled inside components) */}
           <Route path="/network" element={<HomePage />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
 
-          {/* Catch-all fallback */}
+          {/* Fallback */}
           <Route path="*" element={<Login />} />
         </Routes>
-      </HashRouter>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </HashRouter>
   );
 }
