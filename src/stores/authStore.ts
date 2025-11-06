@@ -71,31 +71,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setProfile: (profile) => set({ profile }),
 
-  // 🔍 Check session on startup with retry
-  checkUser: async () => {
-    console.log("🔍 Checking Supabase session...");
-    let attempts = 0;
-    while (attempts < 3) {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
+checkUser: async () => {
+  console.log("🔍 Checking Supabase session...");
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw error;
 
-        if (data.session?.user) {
-          console.log("✅ Active session:", data.session.user.email);
-          const profile = await ensureCommunityUser(data.session.user);
-          set({ profile, loading: false });
-          return;
-        } else {
-          console.log("🚫 No active session (attempt", attempts + 1, ")");
-        }
-      } catch (err) {
-        console.error("❌ Error checking session:", err);
-      }
-      attempts++;
-      await new Promise((r) => setTimeout(r, 500));
+    if (data.session?.user) {
+      console.log("✅ Active session:", data.session.user.email);
+      const profile = await ensureCommunityUser(data.session.user);
+      set({ profile, loading: false });
+    } else {
+      console.log("🚫 No active Supabase session.");
+      set({ profile: null, loading: false });
     }
+  } catch (err) {
+    console.error("❌ Error checking session:", err);
     set({ profile: null, loading: false });
-  },
+  }
+},
+
 
   // 🔑 Sign-in
   signIn: async (email: string, password: string) => {
