@@ -6,7 +6,22 @@ import { Dashboard } from "@/components/dashboard/Dashboard";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { Zap } from "lucide-react";
 import { toast } from "sonner";
-import { BuildVersion } from "@/components/BuildVersion"; // 👈 ADD THIS LINE
+import { BuildVersion } from "@/components/BuildVersion"; 
+import { useAuthGuard } from "@/hooks/useAuthGuard";
+
+export default function HomePage() {
+  useAuthGuard(true); // 🔐 Require login for this page
+
+  return (
+    <div className="p-6 text-center">
+      <h1 className="text-3xl font-bold text-gold mb-4">Welcome to Synapse Link</h1>
+      <p className="text-muted-foreground">
+        You are logged in and viewing the protected network page.
+      </p>
+    </div>
+  );
+}
+
 
 function SplashScreen() {
   return (
