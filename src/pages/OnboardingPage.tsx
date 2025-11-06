@@ -3,6 +3,21 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
+
+export default function OnboardingPage() {
+  useAuthGuard(true); // 🔐 Require login for this page
+
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold text-gold mb-4">Onboarding</h1>
+      <p className="text-muted-foreground">
+        Welcome! Let’s complete your profile setup.
+      </p>
+    </div>
+  );
+}
+
 
 export default function OnboardingPage() {
   const navigate = useNavigate();
