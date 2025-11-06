@@ -58,14 +58,14 @@ export default function App() {
     };
   }, [setProfile, checkUser]);
 
-  // 🌀 1️⃣ Hold UI until Supabase finishes hydration
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-        <p className="text-lg animate-pulse">Checking your session...</p>
-      </div>
-    );
-  }
+ if (loading) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+      <p className="text-lg animate-pulse">Authenticating your session...</p>
+    </div>
+  );
+}
+
 
   // 🚨 2️⃣ Wrap routes in a try/catch error boundary (no more crash loop)
   try {
