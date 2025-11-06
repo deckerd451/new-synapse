@@ -48,12 +48,18 @@ class ErrorBoundary extends React.Component<
 }
 
 export default function App() {
-  const { profile, loading, setProfile, checkUser } = useAuthStore();
+  const { checkUser, setProfile } = useAuthStore();
+  const [loading, setLoading] = useState(true);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     console.log("🧠 Initializing Supabase auth handling...");
-    checkUser();
+
+    const init = async () => {
+      await checkUser();
+      setLoading(false);
+    };
+    init();
 
     const {
       data: { subscription },
@@ -71,7 +77,7 @@ export default function App() {
     const timer = setTimeout(() => {
       console.log("🟢 App Ready: Router safe to mount");
       setReady(true);
-    }, 1200);
+    }, 1000);
 
     return () => {
       subscription.unsubscribe();
@@ -87,32 +93,23 @@ export default function App() {
     );
   }
 
-  // 🧩 Safe router rendering within error boundary
+  // ✅ Router now simplified — no inline auth logic
   return (
     <ErrorBoundary>
       <HashRouter>
         <Routes>
-          {/* Root decision logic */}
-          <Route
-            path="/"
-            element={profile ? <HomePage /> : <Login />}
-          />
+          {/* Default route (redirects handled by guards) */}
+          <Route path="/" element={<Login />} />
 
-          {/* Auth routes */}
+          {/* Public Auth routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/reset-password" element={<Login />} />
 
-          {/* Protected routes */}
-          <Route
-            path="/network"
-            element={profile ? <HomePage /> : <Login />}
-          />
-          <Route
-            path="/onboarding"
-            element={profile ? <OnboardingPage /> : <Login />}
-          />
+          {/* Protected routes (guards inside components) */}
+          <Route path="/network" element={<HomePage />} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
 
-          {/* Fallback */}
+          {/* Catch-all fallback */}
           <Route path="*" element={<Login />} />
         </Routes>
       </HashRouter>
