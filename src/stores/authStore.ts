@@ -91,24 +91,62 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // Check whether a persisted session exists in Supabase.  If it does
   // we hydrate the store with the associated profile and mark loading
   // complete.  If not we clear the profile and also end the loading state.
-  checkUser: async () => {
-    console.log("Checking Supabase session...");
-    try {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) throw error;
-      if (data.session?.user) {
-        console.log("✅ Active session:", data.session.user.email);
-        const profile = await ensureCommunityUser(data.session.user);
-        set({ profile, loading: false });
-      } else {
-        console.log("No active Supabase session.");
-        set({ profile: null, loading: false });
-      }
-    } catch (err) {
-      console.error("❌ Error checking session:", err);
-      set({ profile: null, loading: false });
-    }
-  },
+      checkUser: async () => {
+        console.log("Checking Supabase session...");
+        try {
+          /*
+           * When Supabase redirects back from a password recovery link the URL
+           * contains access_token and refresh_token query parameters.  Without
+           * explicitly exchanging these tokens for a session the client will
+           * remain unauthenticated which causes the UI to hang on the
+           * "Authenticating your session" screen.  Detect these query
+           * parameters and call setSession() to hydrate Supabase's internal
+           * state.  Afterwards remove the parameters from the address bar to
+           * prevent repeated calls on subsequent navigations.
+           */
+          if (typeof window !== "undefined") {
+            const url = new URL(window.location.href);
+            const accessToken = url.searchParams.get("access_token");
+            const refreshToken = url.searchParams.get("refresh_token");
+            if (accessToken && refreshToken) {
+              console.log("🔄 Restoring session from URL tokens...");
+              const { error: setSessionError } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken,
+              });
+              if (setSessionError) {
+                console.error(
+                  "❌ Failed to set session from URL:",
+                  setSessionError,
+                );
+              }
+              // Clean up the query parameters so this logic doesn't run again on
+              // every navigation.  Preserve the existing hash fragment.
+              url.searchParams.delete("access_token");
+              url.searchParams.delete("refresh_token");
+              url.searchParams.delete("type");
+              window.history.replaceState(
+                {},
+                document.title,
+                url.pathname + url.search + url.hash,
+              );
+            }
+          }
+          const { data, error } = await supabase.auth.getSession();
+          if (error) throw error;
+          if (data.session?.user) {
+            console.log("✅ Active session:", data.session.user.email);
+            const profile = await ensureCommunityUser(data.session.user);
+            set({ profile, loading: false });
+          } else {
+            console.log("No active Supabase session.");
+            set({ profile: null, loading: false });
+          }
+        } catch (err) {
+          console.error("❌ Error checking session:", err);
+          set({ profile: null, loading: false });
+        }
+      },
 
   // Sign in with an email and password.  On success we ensure a
   // corresponding community user exists and update the profile.
