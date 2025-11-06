@@ -1,17 +1,15 @@
-name: 🚀 Deploy Vite site to GitHub Pages
+name: 🚀 Deploy Vite site to GitHub Pages (auto-cache-bust)
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
 
-# Required permissions for GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Prevent overlapping builds
 concurrency:
   group: "pages"
   cancel-in-progress: true
@@ -33,12 +31,20 @@ jobs:
       - name: 📦 Install dependencies
         run: npm ci
 
-      # Optional: Fix for Vite+Rollup on some runners
-      - name: 🩹 Downgrade Rollup (avoids native binary bug)
+      # 🩹 Fix for some Rollup binary bugs on GitHub runners
+      - name: 🩹 Downgrade Rollup
         run: npm install rollup@3 --save-exact
+
+      # 🧭 Add cache-busting timestamp (forces new CDN + browser cache)
+      - name: 🔢 Add build timestamp
+        run: echo "BUILD_VERSION=$(date +%s)" > src/version.txt
 
       - name: 🏗️ Build Vite site
         run: npm run build
+
+      # 🧹 Force CDN refresh by touching .nojekyll
+      - name: 🧹 Force Pages CDN refresh
+        run: echo "pages cache bust at $(date)" > dist/.nojekyll
 
       - name: 📤 Upload build output
         uses: actions/upload-pages-artifact@v3
