@@ -7,12 +7,9 @@ import { toast } from "sonner";
 import { useAuthGuard } from "@/hooks/useAuthGuard";
 
 export function Login() {
-  useAuthGuard(false); // 🚪 Redirect logged-in users away from login
-  ...
-}
+  // 🚪 Redirect logged-in users away from login
+  useAuthGuard(false);
 
-
-export function Login() {
   const [mode, setMode] = useState<"login" | "signup" | "forgot" | "reset">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,7 +42,6 @@ export function Login() {
     if (error) toast.error(error.message);
     else toast.success("Account created! Check your email to confirm.");
   };
-
 
   // ✉️ Request password reset email
   const handleForgot = async () => {
