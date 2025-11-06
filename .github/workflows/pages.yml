@@ -1,15 +1,17 @@
-name: Deploy Vite site to GitHub Pages
+name: 🚀 Deploy Vite site to GitHub Pages
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
 
+# Required permissions for GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
+# Prevent overlapping builds
 concurrency:
   group: "pages"
   cancel-in-progress: true
@@ -17,30 +19,31 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
+      - name: 🧱 Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: ⚙️ Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: npm
 
-      - name: Install dependencies
-        run: npm install
+      - name: 📦 Install dependencies
+        run: npm ci
 
-      # 🩹 Force JS-only Rollup (avoids native binary bug)
-      - name: Downgrade Rollup to v3
+      # Optional: Fix for Vite+Rollup on some runners
+      - name: 🩹 Downgrade Rollup (avoids native binary bug)
         run: npm install rollup@3 --save-exact
 
-      - name: Build Vite site
+      - name: 🏗️ Build Vite site
         run: npm run build
 
-      - name: Upload build output
+      - name: 📤 Upload build output
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist
+          path: dist
 
   deploy:
     needs: build
@@ -50,6 +53,6 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Deploy to GitHub Pages
+      - name: 🚀 Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
