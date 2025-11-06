@@ -6,7 +6,10 @@ import OnboardingPage from "@/pages/OnboardingPage";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabaseClient";
 
-// 🧱 Error Boundary
+/** ────────────────────────────────
+ * 🧱 Error Boundary (final version)
+ * Prevents blank screen and provides reload fallback.
+ * ──────────────────────────────── */
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean }
@@ -24,14 +27,14 @@ class ErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center text-center bg-background text-foreground">
+        <div className="min-h-screen flex items-center justify-center bg-background text-foreground text-center">
           <div>
-            <p className="text-red-400 font-bold mb-2 text-lg">
+            <p className="text-red-400 font-bold mb-3 text-lg">
               Something went wrong while loading.
             </p>
             <button
-              className="border border-gold px-3 py-1 rounded hover:bg-gold/10"
               onClick={() => window.location.reload()}
+              className="border border-gold px-4 py-2 rounded hover:bg-gold/10 transition"
             >
               Reload App
             </button>
@@ -43,7 +46,10 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-// 🧩 Router isolated for safe mount
+/** ────────────────────────────────
+ * 🧩 Router Component
+ * Isolated so it mounts only after hydration
+ * ──────────────────────────────── */
 function AppRouter() {
   const { profile } = useAuthStore();
 
@@ -65,35 +71,42 @@ function AppRouter() {
   );
 }
 
+/** ────────────────────────────────
+ * 🌐 Main App Component
+ * Handles Supabase session check, then safely mounts router
+ * ──────────────────────────────── */
 export default function App() {
   const { checkUser, setProfile } = useAuthStore();
-  const [ready, setReady] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     console.log("🧠 Initializing Supabase auth handling...");
-
-    const init = async () => {
+    const initAuth = async () => {
       console.log("🔍 Checking Supabase session...");
       await checkUser();
+      setLoading(false);
     };
-    init();
+    initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("🔄 Supabase auth event:", event);
-      if (session?.user) {
-        console.log("✅ Logged in:", session.user.email);
-        setProfile(session.user);
-      } else if (event === "SIGNED_OUT") {
-        console.log("👋 Signed out");
-        setProfile(null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log("🔄 Supabase auth event:", event);
+        if (session?.user) {
+          console.log("✅ Logged in:", session.user.email);
+          setProfile(session.user);
+        } else if (event === "SIGNED_OUT") {
+          console.log("👋 Signed out");
+          setProfile(null);
+        }
       }
-    });
+    );
 
-    // 🕓 Give router time to safely hydrate
+    // Delay router mount until after hydration
     const timer = setTimeout(() => {
-      console.log("🟢 Router safe to mount");
-      setReady(true);
-    }, 800);
+      console.log("🟢 React hydration complete – router safe to mount");
+      setHydrated(true);
+    }, 1000);
 
     return () => {
       subscription.unsubscribe();
@@ -101,7 +114,7 @@ export default function App() {
     };
   }, [checkUser, setProfile]);
 
-  if (!ready) {
+  if (loading || !hydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <p className="text-lg animate-pulse">Authenticating your session...</p>
@@ -109,12 +122,12 @@ export default function App() {
     );
   }
 
-  // ✅ Render router inside boundary
+  // ✅ Router rendered safely after hydration
   return (
-    <HashRouter>
-      <ErrorBoundary>
+    <ErrorBoundary>
+      <HashRouter>
         <AppRouter />
-      </ErrorBoundary>
-    </HashRouter>
+      </HashRouter>
+    </ErrorBoundary>
   );
 }
