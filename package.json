@@ -9,7 +9,7 @@
     "preview": "vite preview --host 0.0.0.0 --port ${PORT:-4173}",
     "predeploy": "vite build",
     "deploy": "gh-pages -d dist"
-  },  // 👈 this comma was missing
+  },
 
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
