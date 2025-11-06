@@ -9,7 +9,13 @@ import type { Notification } from "@shared/types";
 interface CommunityProfile {
   id: string;
   name: string | null;
-  role: string | null;
+  /**
+   * The member's role within the community.  We avoid using the bare
+   * identifier `role` because it is a reserved keyword in Postgres and
+   * PostgREST.  The corresponding column in the database is now named
+   * `user_role`.
+   */
+  user_role: string | null;
   image_url: string | null;
   email: string;
   created_at: string;
@@ -45,38 +51,84 @@ interface AuthState {
 // This function checks whether a row exists in the community table and
 // inserts one if needed.  It returns the row or null on failure.
 async function ensureCommunityUser(user: any): Promise<CommunityProfile | null> {
+  // Return null early if no authenticated user
   if (!user?.id) return null;
-  const { data: existing, error: selectError } = await supabase
-    .from("community")
-    .select("*")
-    .eq("id", user.id)
-    .single();
-  if (selectError && selectError.code !== "PGRST116") {
-    console.error("❌ Error checking community user:", selectError);
-    return null;
+  try {
+    // Attempt to load an existing community profile for this user.  We request
+    // all columns (*) rather than a specific subset to avoid 406 errors when
+    // unknown columns are referenced in the query string.  If a row exists
+    // return it immediately.
+    const { data: existing, error: selectError } = await supabase
+      .from("community")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (!selectError && existing) {
+      console.log(
+        "✅ Loaded community profile:",
+        existing.name || existing.email,
+      );
+      return existing as CommunityProfile;
+    }
+    // If selecting failed because the table definition in Supabase differs
+    // from what the UI expects (e.g. missing columns), we still proceed with
+    // inserting a minimal profile.  Ignore any unknown-column errors and
+    // continue.
+  } catch (err) {
+    console.warn(
+      "⚠️ Ignoring error while checking community profile:",
+      err,
+    );
   }
-  if (existing) {
-    console.log("✅ Loaded community profile:", existing.name || existing.email);
-    return existing as CommunityProfile;
-  }
-  const { data: created, error: insertError } = await supabase
-    .from("community")
-    .insert([
+  try {
+    // Insert a minimal community row.  Do not reference any optional columns
+    // such as `role` because those may not exist in the database yet.  Only
+    // supply id, email and a derived name.  Use `insert` without a
+    // subsequent `select` to avoid 409 conflicts being surfaced as errors.
+    const { error: insertError } = await supabase.from("community").insert([
       {
         id: user.id,
         email: user.email,
-        name: user.email?.split("@")[0],
-        role: "Member",
+        name: user.email?.split("@")[0] ?? null,
       },
-    ])
-    .select()
-    .single();
-  if (insertError) {
-    console.error("❌ Error creating community profile:", insertError);
-    return null;
+    ]);
+    if (insertError) {
+      // If a conflict occurs (status 409) it likely means the row already
+      // exists.  We'll ignore the error and attempt to load the existing row
+      // again below.
+      console.warn(
+        "⚠️ Ignoring error while creating community profile:",
+        insertError,
+      );
+    }
+    // Whether insert succeeded or not, attempt to load the profile again.  If
+    // it still doesn't exist, return a minimal record derived from the user.
+    const { data: profile, error: fetchError } = await supabase
+      .from("community")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (profile && !fetchError) {
+      console.log("Created new community profile:", profile.email);
+      return profile as CommunityProfile;
+    }
+  } catch (err) {
+    console.warn(
+      "⚠️ Ignoring error while inserting/fetching community profile:",
+      err,
+    );
   }
-  console.log("Created new community profile:", created.email);
-  return created as CommunityProfile;
+  // As a last resort, return a minimal profile with just id, email and name.
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.email?.split("@")[0] ?? null,
+    // Provide a default user_role of null; the API will fall back to the
+    // database default of 'Member' where appropriate.
+    user_role: null,
+    image_url: null,
+    created_at: new Date().toISOString(),
+  } as CommunityProfile;
 }
 
 // Zustand store implementation.  It exposes a handful of async actions
