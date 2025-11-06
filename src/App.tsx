@@ -6,7 +6,7 @@ import OnboardingPage from "@/pages/OnboardingPage";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabaseClient";
 
-// 🧱 Error Boundary
+// 🧱 Error Boundary (global catch)
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean }
@@ -47,6 +47,20 @@ class ErrorBoundary extends React.Component<
   }
 }
 
+// 🧩 SafeRender wrapper for per-component crash tracking
+function SafeRender({ children, name }: { children: React.ReactNode; name: string }) {
+  try {
+    return <>{children}</>;
+  } catch (err) {
+    console.error(`💥 Render failed in ${name}:`, err);
+    return (
+      <div className="text-red-400 text-center mt-20">
+        <p>Component "{name}" failed to render.</p>
+      </div>
+    );
+  }
+}
+
 export default function App() {
   const { checkUser, setProfile } = useAuthStore();
   const [loading, setLoading] = useState(true);
@@ -56,6 +70,7 @@ export default function App() {
     console.log("🧠 Initializing Supabase auth handling...");
 
     const init = async () => {
+      console.log("🔍 Checking Supabase session...");
       await checkUser();
       setLoading(false);
     };
@@ -74,11 +89,10 @@ export default function App() {
       }
     });
 
-    // 🕓 Delay Router mount to ensure DOM hydration
     const timer = setTimeout(() => {
-      console.log("🟢 Router ready to mount safely");
+      console.log("🟢 App Ready: Router safe to mount");
       setRouterReady(true);
-    }, 400);
+    }, 500);
 
     return () => {
       subscription.unsubscribe();
@@ -94,24 +108,66 @@ export default function App() {
     );
   }
 
-  // ✅ Delay Routes until router is fully safe
+  // 🧩 Full app render
   return (
     <HashRouter>
       <ErrorBoundary>
         <Routes>
           {/* Root */}
-          <Route path="/" element={<Login />} />
+          <Route
+            path="/"
+            element={
+              <SafeRender name="Login">
+                <Login />
+              </SafeRender>
+            }
+          />
 
           {/* Public */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/reset-password" element={<Login />} />
+          <Route
+            path="/login"
+            element={
+              <SafeRender name="Login">
+                <Login />
+              </SafeRender>
+            }
+          />
+          <Route
+            path="/reset-password"
+            element={
+              <SafeRender name="ResetPassword">
+                <Login />
+              </SafeRender>
+            }
+          />
 
           {/* Protected */}
-          <Route path="/network" element={<HomePage />} />
-          <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route
+            path="/network"
+            element={
+              <SafeRender name="HomePage">
+                <HomePage />
+              </SafeRender>
+            }
+          />
+          <Route
+            path="/onboarding"
+            element={
+              <SafeRender name="OnboardingPage">
+                <OnboardingPage />
+              </SafeRender>
+            }
+          />
 
           {/* Fallback */}
-          <Route path="*" element={<Login />} />
+          <Route
+            path="*"
+            element={
+              <SafeRender name="Fallback">
+                <Login />
+              </SafeRender>
+            }
+          />
         </Routes>
       </ErrorBoundary>
     </HashRouter>
