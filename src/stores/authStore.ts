@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 
+// 🧠 Type definitions
 interface CommunityProfile {
   id: string;
   name: string | null;
@@ -21,7 +22,7 @@ interface AuthState {
   signOut: () => Promise<void>;
 }
 
-// 🧩 Ensure that a user exists in the community table
+// 🧩 Ensure user exists in community table
 async function ensureCommunityUser(user: any): Promise<CommunityProfile | null> {
   if (!user?.id) return null;
 
@@ -36,13 +37,11 @@ async function ensureCommunityUser(user: any): Promise<CommunityProfile | null> 
     return null;
   }
 
-  // If the profile exists, return it
   if (existing) {
     console.log("✅ Loaded community profile:", existing.name || existing.email);
     return existing;
   }
 
-  // Otherwise, create a new profile
   const { data: created, error: insertError } = await supabase
     .from("community")
     .insert([
@@ -51,7 +50,6 @@ async function ensureCommunityUser(user: any): Promise<CommunityProfile | null> 
         email: user.email,
         name: user.email?.split("@")[0],
         role: "Member",
-        image_url: null,
       },
     ])
     .select()
@@ -66,35 +64,40 @@ async function ensureCommunityUser(user: any): Promise<CommunityProfile | null> 
   return created;
 }
 
-// 🧠 Zustand auth store
+// 🧱 Auth store with silent refresh + hydration guard
 export const useAuthStore = create<AuthState>((set, get) => ({
   profile: null,
   loading: true,
 
   setProfile: (profile) => set({ profile }),
 
-  // 🧭 Check session and sync community profile
+  // 🔍 Check session on startup with retry
   checkUser: async () => {
     console.log("🔍 Checking Supabase session...");
-    try {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) throw error;
+    let attempts = 0;
+    while (attempts < 3) {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
 
-      if (data.session?.user) {
-        console.log("✅ Active Supabase user:", data.session.user.email);
-        const profile = await ensureCommunityUser(data.session.user);
-        set({ profile, loading: false });
-      } else {
-        console.log("🚫 No active Supabase session.");
-        set({ profile: null, loading: false });
+        if (data.session?.user) {
+          console.log("✅ Active session:", data.session.user.email);
+          const profile = await ensureCommunityUser(data.session.user);
+          set({ profile, loading: false });
+          return;
+        } else {
+          console.log("🚫 No active session (attempt", attempts + 1, ")");
+        }
+      } catch (err) {
+        console.error("❌ Error checking session:", err);
       }
-    } catch (err) {
-      console.error("❌ Error checking session:", err);
-      set({ profile: null, loading: false });
+      attempts++;
+      await new Promise((r) => setTimeout(r, 500));
     }
+    set({ profile: null, loading: false });
   },
 
-  // 🔑 Login
+  // 🔑 Sign-in
   signIn: async (email: string, password: string) => {
     set({ loading: true });
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -136,3 +139,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ profile: null, loading: false });
   },
 }));
+
+// 🔁 Silent token refresh every 10 minutes
+setInterval(async () => {
+  const { data, error } = await supabase.auth.refreshSession();
+  if (error) {
+    console.warn("⚠️ Token refresh failed:", error.message);
+    useAuthStore.getState().setProfile(null);
+  } else if (data.session?.user) {
+    console.log("🔄 Session refreshed for:", data.session.user.email);
+    const profile = await ensureCommunityUser(data.session.user);
+    useAuthStore.getState().setProfile(profile);
+  }
+}, 600_000); // 10 minutes
