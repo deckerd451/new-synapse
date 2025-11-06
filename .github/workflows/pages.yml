@@ -1,4 +1,4 @@
-name: 🚀 Deploy Vite site to GitHub Pages (auto-cache-bust)
+name: 🚀 Deploy Vite site to GitHub Pages (auto-cache-bust + diagnostic)
 
 on:
   push:
@@ -31,22 +31,32 @@ jobs:
       - name: 📦 Install dependencies
         run: npm ci
 
-      # 🩹 Fix for some Rollup binary bugs on GitHub runners
-      - name: 🩹 Downgrade Rollup
+      - name: 🩹 Downgrade Rollup (fix binary issues)
         run: npm install rollup@3 --save-exact
 
-      # 🧭 Add cache-busting timestamp (forces new CDN + browser cache)
       - name: 🔢 Add build timestamp
         run: echo "BUILD_VERSION=$(date +%s)" > src/version.txt
 
       - name: 🏗️ Build Vite site
         run: npm run build
 
-      # 🧹 Force CDN refresh by touching .nojekyll
       - name: 🧹 Force Pages CDN refresh
         run: echo "pages cache bust at $(date)" > dist/.nojekyll
 
+      # ✅ Diagnostic step: verify dist exists and list contents
+      - name: 🔍 Verify build output
+        run: |
+          if [ ! -d "dist" ]; then
+            echo "❌ ERROR: dist directory not found!"
+            exit 1
+          fi
+          echo "✅ dist directory exists."
+          echo "📁 Listing files:"
+          ls -R dist
+
+      # ✅ Upload only if dist exists
       - name: 📤 Upload build output
+        if: success()
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
