@@ -101,8 +101,11 @@ export default function App() {
     // is automatically unsubscribed when the component unmounts.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        // When a user signs in or a session is restored we re‑run the
+        // checkUser action.  This will call ensureCommunityUser and
+        // hydrate the store with the correct profile from the database.
         if (session?.user) {
-          setProfile(session.user as any);
+          await checkUser();
         } else if (event === "SIGNED_OUT") {
           setProfile(null);
         }
