@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Routes, Route, HashRouter } from "react-router-dom";
+import { HashRouter, Routes, Route } from "react-router-dom";
 import { Login } from "@/components/auth/Login";
 import HomePage from "@/pages/HomePage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabaseClient";
 
-// 🧱 Robust Error Boundary (class-based)
+// 🧱 Error Boundary
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean }
@@ -50,7 +50,7 @@ class ErrorBoundary extends React.Component<
 export default function App() {
   const { checkUser, setProfile } = useAuthStore();
   const [loading, setLoading] = useState(true);
-  const [ready, setReady] = useState(false);
+  const [routerReady, setRouterReady] = useState(false);
 
   useEffect(() => {
     console.log("🧠 Initializing Supabase auth handling...");
@@ -74,18 +74,19 @@ export default function App() {
       }
     });
 
+    // 🕓 Delay Router mount to ensure DOM hydration
     const timer = setTimeout(() => {
-      console.log("🟢 App Ready: Router safe to mount");
-      setReady(true);
-    }, 1000);
+      console.log("🟢 Router ready to mount safely");
+      setRouterReady(true);
+    }, 400);
 
     return () => {
       subscription.unsubscribe();
       clearTimeout(timer);
     };
-  }, [setProfile, checkUser]);
+  }, [checkUser, setProfile]);
 
-  if (loading || !ready) {
+  if (loading || !routerReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <p className="text-lg animate-pulse">Authenticating your session...</p>
@@ -93,19 +94,19 @@ export default function App() {
     );
   }
 
-  // ✅ Router first, ErrorBoundary inside
+  // ✅ Delay Routes until router is fully safe
   return (
     <HashRouter>
       <ErrorBoundary>
         <Routes>
-          {/* Default route */}
+          {/* Root */}
           <Route path="/" element={<Login />} />
 
-          {/* Public routes */}
+          {/* Public */}
           <Route path="/login" element={<Login />} />
           <Route path="/reset-password" element={<Login />} />
 
-          {/* Protected routes (auth handled inside components) */}
+          {/* Protected */}
           <Route path="/network" element={<HomePage />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
 
