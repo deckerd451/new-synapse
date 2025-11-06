@@ -1,4 +1,3 @@
-// src/pages/HomePage.tsx
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
@@ -7,6 +6,7 @@ import { Dashboard } from "@/components/dashboard/Dashboard";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { Zap } from "lucide-react";
 import { toast } from "sonner";
+import { BuildVersion } from "@/components/BuildVersion"; // 👈 ADD THIS LINE
 
 function SplashScreen() {
   return (
@@ -49,7 +49,7 @@ export default function HomePage() {
 
   // 🧱 Main content
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="min-h-screen flex flex-col bg-background text-foreground relative">
       {profile ? (
         <>
           <AppHeader />
@@ -61,6 +61,9 @@ export default function HomePage() {
       ) : (
         <Login />
       )}
+
+      {/* ✅ Add version label (always visible in corner) */}
+      <BuildVersion />
     </div>
   );
 }
