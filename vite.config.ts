@@ -1,13 +1,13 @@
 // vite.config.ts
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import path from "path"; // 👈 make sure this import is present
+import path from "path";
 
 export default defineConfig({
-  plugins: [react()],
-
-  // ✅ Required for GitHub Pages under /new-synapse/
+  // ✅ REQUIRED for GitHub Pages project path
   base: "/new-synapse/",
+
+  plugins: [react()],
 
   resolve: {
     alias: {
@@ -34,5 +34,14 @@ export default defineConfig({
   build: {
     sourcemap: true,
     outDir: "dist",
+
+    // ✅ Cache-busting filenames (works with workflow)
+    rollupOptions: {
+      output: {
+        entryFileNames: "assets/[name]-[hash].js",
+        chunkFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash][extname]",
+      },
+    },
   },
 });
