@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Routes, Route, HashRouter } from "react-router-dom";
 import { Login } from "@/components/auth/Login";
 import HomePage from "@/pages/HomePage";
@@ -6,31 +6,45 @@ import OnboardingPage from "@/pages/OnboardingPage";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabaseClient";
 
-// 🧱 Simple error boundary component
-function ErrorBoundary({ children }: { children: React.ReactNode }) {
-  const [hasError, setHasError] = useState(false);
+// 🧱 Robust Error Boundary (class-based)
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
 
-  return hasError ? (
-    <div className="min-h-screen flex items-center justify-center text-center bg-background text-foreground">
-      <div>
-        <p className="text-red-400 font-bold mb-2 text-lg">
-          Something went wrong while loading.
-        </p>
-        <button
-          className="border border-gold px-3 py-1 rounded hover:bg-gold/10"
-          onClick={() => window.location.reload()}
-        >
-          Reload App
-        </button>
-      </div>
-    </div>
-  ) : (
-    <React.ErrorBoundary
-      fallbackRender={() => setHasError(true)}
-    >
-      {children}
-    </React.ErrorBoundary>
-  );
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("💥 Caught error in boundary:", error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center text-center bg-background text-foreground">
+          <div>
+            <p className="text-red-400 font-bold mb-2 text-lg">
+              Something went wrong while loading.
+            </p>
+            <button
+              className="border border-gold px-3 py-1 rounded hover:bg-gold/10"
+              onClick={() => window.location.reload()}
+            >
+              Reload App
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 export default function App() {
@@ -73,7 +87,7 @@ export default function App() {
     );
   }
 
-  // 🧩 Render router safely within ErrorBoundary
+  // 🧩 Safe router rendering within error boundary
   return (
     <ErrorBoundary>
       <HashRouter>
@@ -81,13 +95,7 @@ export default function App() {
           {/* Root decision logic */}
           <Route
             path="/"
-            element={
-              profile ? (
-                <HomePage />
-              ) : (
-                <Login /> // ✅ Show login directly, no Navigate yet
-              )
-            }
+            element={profile ? <HomePage /> : <Login />}
           />
 
           {/* Auth routes */}
