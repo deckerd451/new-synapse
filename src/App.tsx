@@ -123,7 +123,11 @@ export default function App() {
       subscription.unsubscribe();
       clearTimeout(timer);
     };
-  }, [checkUser, setProfile]);
+  // The effect depends only on checkUser, not on setProfile.  setProfile
+  // comes from Zustand and is stable across renders; including it as a
+  // dependency can cause this effect to re‑run whenever the store is
+  // updated, leading to repeated calls of checkUser() and the timer.
+  }, [checkUser]);
 
   if (loading || !hydrated) {
     return (
