@@ -1,20 +1,46 @@
 import { useEffect, useState } from "react";
-import { Routes, Route, Navigate, HashRouter } from "react-router-dom";
+import { Routes, Route, HashRouter } from "react-router-dom";
 import { Login } from "@/components/auth/Login";
 import HomePage from "@/pages/HomePage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabaseClient";
 
+// 🧱 Simple error boundary component
+function ErrorBoundary({ children }: { children: React.ReactNode }) {
+  const [hasError, setHasError] = useState(false);
+
+  return hasError ? (
+    <div className="min-h-screen flex items-center justify-center text-center bg-background text-foreground">
+      <div>
+        <p className="text-red-400 font-bold mb-2 text-lg">
+          Something went wrong while loading.
+        </p>
+        <button
+          className="border border-gold px-3 py-1 rounded hover:bg-gold/10"
+          onClick={() => window.location.reload()}
+        >
+          Reload App
+        </button>
+      </div>
+    </div>
+  ) : (
+    <React.ErrorBoundary
+      fallbackRender={() => setHasError(true)}
+    >
+      {children}
+    </React.ErrorBoundary>
+  );
+}
+
 export default function App() {
   const { profile, loading, setProfile, checkUser } = useAuthStore();
-  const [ready, setReady] = useState(false); // ✅ router safety lock
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     console.log("🧠 Initializing Supabase auth handling...");
     checkUser();
 
-    // 🎧 Listen for login/logout
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -28,20 +54,17 @@ export default function App() {
       }
     });
 
-    // ✅ Once Supabase has checked session, unlock router
     const timer = setTimeout(() => {
-      console.log("🟢 App Ready: Router can safely mount now");
+      console.log("🟢 App Ready: Router safe to mount");
       setReady(true);
-    }, 1200); // 1.2s guard ensures Supabase has fully hydrated
+    }, 1200);
 
     return () => {
-      console.log("🧹 Cleaning up Supabase listener...");
       subscription.unsubscribe();
       clearTimeout(timer);
     };
   }, [setProfile, checkUser]);
 
-  // 🌀 Hold the app until both Supabase + Router are safe
   if (loading || !ready) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
@@ -50,32 +73,41 @@ export default function App() {
     );
   }
 
-  // ✅ Safe router rendering after hydration lock release
+  // 🧩 Render router safely within ErrorBoundary
   return (
-    <HashRouter>
-      <Routes>
-        {/* 🔁 Root redirect logic */}
-        <Route
-          path="/"
-          element={
-            profile ? <Navigate to="/network" replace /> : <Navigate to="/login" replace />
-          }
-        />
-        {/* 🔐 Protected routes */}
-        <Route
-          path="/network"
-          element={profile ? <HomePage /> : <Navigate to="/login" replace />}
-        />
-        <Route
-          path="/onboarding"
-          element={profile ? <OnboardingPage /> : <Navigate to="/login" replace />}
-        />
-        {/* 🔑 Auth routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/reset-password" element={<Login />} />
-        {/* 🧭 Catch-all redirect */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </HashRouter>
+    <ErrorBoundary>
+      <HashRouter>
+        <Routes>
+          {/* Root decision logic */}
+          <Route
+            path="/"
+            element={
+              profile ? (
+                <HomePage />
+              ) : (
+                <Login /> // ✅ Show login directly, no Navigate yet
+              )
+            }
+          />
+
+          {/* Auth routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<Login />} />
+
+          {/* Protected routes */}
+          <Route
+            path="/network"
+            element={profile ? <HomePage /> : <Login />}
+          />
+          <Route
+            path="/onboarding"
+            element={profile ? <OnboardingPage /> : <Login />}
+          />
+
+          {/* Fallback */}
+          <Route path="*" element={<Login />} />
+        </Routes>
+      </HashRouter>
+    </ErrorBoundary>
   );
 }
