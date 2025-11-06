@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import { Login } from "@/components/auth/Login";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import HomePage from "@/pages/HomePage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import { useAuthStore } from "@/stores/authStore";
@@ -60,7 +61,13 @@ function AppRouter() {
     <Routes>
       <Route path="/" element={<Login />} />
       <Route path="/login" element={<Login />} />
-      <Route path="/reset-password" element={<Login />} />
+          {/*
+           * Route for password reset.  When a user follows a password recovery
+           * link they will land on this path.  The ResetPasswordPage is
+           * responsible for restoring the Supabase session (via checkUser())
+           * and then allowing the user to set a new password.
+           */}
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/network" element={profile ? <HomePage /> : <Login />} />
       <Route
         path="/onboarding"
