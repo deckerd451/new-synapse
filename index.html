@@ -6,6 +6,12 @@
     <title>Synapse Link</title>
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   </head>
+  
+  <script>
+  // 🔁 Ensure SPA always opens on a valid hash route
+  if (!location.hash) location.replace(location.href + "#/login");
+</script>
+
 
   <body>
     <!-- ✅ React mount point -->
