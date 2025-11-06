@@ -10,34 +10,39 @@ import "@/index.css";
 import { Toaster } from "@/components/ui/sonner";
 import { supabase } from "@/lib/supabaseClient";
 
-// ✅ Expose Supabase globally for debugging
 window.supabase = supabase;
-console.log("🧠 Supabase initialized:", window.supabase);
-
-// ✅ Apply dark theme globally
 document.documentElement.classList.add("dark");
 
-// ✅ Handle Supabase magic-link redirect hash (GitHub Pages fix)
+// ✅ 1. Handle all Supabase redirects (magic link + GitHub OAuth)
 (async () => {
   const hash = window.location.hash;
-  if (hash && hash.includes("access_token")) {
-    const params = new URLSearchParams(hash.replace("#", "?"));
-    const access_token = params.get("access_token");
-    const refresh_token = params.get("refresh_token");
-    if (access_token && refresh_token) {
-      console.log("🔐 Restoring Supabase session from URL hash...");
+  const query = window.location.search;
+
+  // Supabase redirects can use hash (#) OR query (?)
+  const urlParams = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : query.slice(1));
+
+  const access_token = urlParams.get("access_token");
+  const refresh_token = urlParams.get("refresh_token");
+
+  if (access_token && refresh_token) {
+    console.log("🔐 Restoring Supabase session from redirect tokens...");
+    try {
       await supabase.auth.setSession({ access_token, refresh_token });
-      window.location.hash = ""; // clean up the URL
-      console.log("✅ Supabase session restored after redirect");
+      console.log("✅ Session restored successfully");
+    } catch (err) {
+      console.error("❌ Error restoring session:", err);
     }
+
+    // Clean up the URL
+    const cleanUrl = window.location.origin + window.location.pathname;
+    window.history.replaceState({}, document.title, cleanUrl);
   }
 })();
 
-// ✅ Wait for Supabase session hydration before mounting React
+// ✅ 2. Mount React app
 window.addEventListener("DOMContentLoaded", async () => {
   console.log("🕒 Waiting for Supabase session hydration...");
-
-  await new Promise((res) => setTimeout(res, 300)); // allow localStorage restore
+  await new Promise((res) => setTimeout(res, 300));
 
   const root = document.getElementById("root");
   if (root) {
@@ -50,7 +55,5 @@ window.addEventListener("DOMContentLoaded", async () => {
       </StrictMode>
     );
     console.log("✅ React app mounted successfully (HashRouter)");
-  } else {
-    console.error("❌ No #root element found!");
   }
 });
