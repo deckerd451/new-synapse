@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import { Login } from "@/components/auth/Login";
 import HomePage from "@/pages/HomePage";
@@ -22,12 +22,9 @@ class ErrorBoundary extends React.Component<
     this.state = { hasError: false };
   }
   static getDerivedStateFromError() {
-    // Update state so the next render will show the fallback UI
     return { hasError: true };
   }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    // Log errors for debugging purposes.  In a real application this could
-    // be wired up to an external logging service.
     console.error("Caught error in boundary:", error, info);
   }
   render() {
@@ -53,11 +50,9 @@ class ErrorBoundary extends React.Component<
 }
 
 /**
- * AppRouter defines all routes for the single page application.  It uses
- * React Router's <Routes> component to map paths to elements.  Depending on
- * whether the user is authenticated, it will either render the protected
- * pages or redirect back to the login view.  The higher‑level HashRouter
- * wrapper lives in src/main.tsx so we avoid nesting routers here.
+ * Defines all routes for the application.  Depending on whether a user
+ * profile is available the protected routes will either render the
+ * requested component or fallback to the login page.
  */
 function AppRouter() {
   const { profile } = useAuthStore();
@@ -77,66 +72,40 @@ function AppRouter() {
 }
 
 /**
- * The root application component.  It checks for an active Supabase session
- * before rendering the router.  During the initial check a loading screen
- * is displayed.  After hydration completes the router is rendered within
- * an error boundary to gracefully handle unexpected exceptions.
+ * Root component.  It runs an initial session check on mount and listens
+ * for auth state changes from Supabase.  While the store reports that
+ * it's still loading an existing session we display a simple loading
+ * screen; otherwise we render the router wrapped in an error boundary.
  */
 export default function App() {
-  const { checkUser, setProfile } = useAuthStore();
-  const [hydrated, setHydrated] = useState(false);
-  const [loading, setLoading] = useState(true);
-
+  const { loading, checkUser, setProfile } = useAuthStore();
   useEffect(() => {
-    // Kick off an initial session check.  This will update the store
-    // with the authenticated user if a persisted session exists.
-    const initAuth = async () => {
-      await checkUser();
-      setLoading(false);
-    };
-    initAuth();
-
-    // Listen for auth state changes from Supabase.  When a user signs in
-    // or out we synchronise the Zustand store accordingly.  This listener
-    // is automatically unsubscribed when the component unmounts.
+    // perform initial session check
+    checkUser();
+    // subscribe to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        // When a user signs in or a session is restored we re‑run the
-        // checkUser action.  This will call ensureCommunityUser and
-        // hydrate the store with the correct profile from the database.
+      (event, session) => {
         if (session?.user) {
-          await checkUser();
+          // when a session is restored or a user signs in, refresh the
+          // profile from the database
+          checkUser();
         } else if (event === "SIGNED_OUT") {
           setProfile(null);
         }
       }
     );
-
-    // Delay rendering the router by a small amount to ensure the DOM
-    // has hydrated.  Without this delay React Router may mount before
-    // hydration is complete resulting in mismatched markup.
-    const timer = setTimeout(() => {
-      setHydrated(true);
-    }, 1000);
-
     return () => {
       subscription.unsubscribe();
-      clearTimeout(timer);
     };
-  // The effect depends only on checkUser, not on setProfile.  setProfile
-  // comes from Zustand and is stable across renders; including it as a
-  // dependency can cause this effect to re‑run whenever the store is
-  // updated, leading to repeated calls of checkUser() and the timer.
-  }, [checkUser]);
-
-  if (loading || !hydrated) {
+  }, [checkUser, setProfile]);
+  // show a simple loader until session check completes
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <p className="text-lg animate-pulse">Authenticating your session...</p>
       </div>
     );
   }
-
   return (
     <ErrorBoundary>
       <AppRouter />
