@@ -6,18 +6,29 @@
     <title>Synapse Link</title>
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   </head>
-  
-  <script>
-  // 🔁 Ensure SPA always opens on a valid hash route
-  if (!location.hash) location.replace(location.href + "#/login");
-</script>
 
+  <script>
+    // When deploying to GitHub Pages the application must run as a
+    // single‑page app.  We still want to deep link into the app (e.g.
+    // /#/network) so we need to ensure there is a hash present on
+    // initial page load.  However, Supabase password reset links use
+    // query parameters (access_token, refresh_token) and we must not
+    // clobber those by appending our own hash.  Only if there are no
+    // auth parameters do we redirect to the login route.
+    (function () {
+      var search = new URLSearchParams(location.search);
+      var hasAuthParams = search.has('access_token') || search.has('refresh_token');
+      if (!location.hash && !hasAuthParams) {
+        location.replace(location.href + '#/login');
+      }
+    })();
+  </script>
 
   <body>
-    <!-- ✅ React mount point -->
+    <!-- React mount point -->
     <div id="root"></div>
 
-    <!-- ✅ Load your Vite + React app -->
+    <!-- Load your Vite + React app -->
     <script type="module" src="./src/main.tsx"></script>
   </body>
 </html>
