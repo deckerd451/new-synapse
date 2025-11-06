@@ -1,5 +1,4 @@
-// src/components/auth/Login.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,13 +6,19 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 
 export function Login() {
-  const [mode, setMode] = useState<"login" | "signup" | "forgot" | "reset">(
-    "login"
-  );
+  const [mode, setMode] = useState<"login" | "signup" | "forgot" | "reset">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // 🧩 Automatically switch to reset mode if redirected by Supabase
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes("type=recovery")) {
+      setMode("reset");
+    }
+  }, []);
 
   // 🔑 Login
   const handleLogin = async (e: React.FormEvent) => {
@@ -33,6 +38,7 @@ export function Login() {
     if (error) toast.error(error.message);
     else toast.success("Account created! Check your email to confirm.");
   };
+
 
   // ✉️ Request password reset email
   const handleForgot = async () => {
