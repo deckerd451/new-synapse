@@ -1,33 +1,20 @@
-import { useEffect } from "react";
-import {
-  Routes,
-  Route,
-  Navigate,
-  HashRouter,
-  useLocation,
-} from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Routes, Route, Navigate, HashRouter } from "react-router-dom";
 import { Login } from "@/components/auth/Login";
 import HomePage from "@/pages/HomePage";
 import OnboardingPage from "@/pages/OnboardingPage";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabaseClient";
 
-// 🧩 Small component to log navigation & errors
-function RouteLogger() {
-  const location = useLocation();
-  useEffect(() => {
-    console.log("🧭 Navigated to:", location.pathname);
-  }, [location]);
-  return null;
-}
-
 export default function App() {
   const { profile, loading, setProfile, checkUser } = useAuthStore();
+  const [ready, setReady] = useState(false); // ✅ router safety lock
 
   useEffect(() => {
     console.log("🧠 Initializing Supabase auth handling...");
     checkUser();
 
+    // 🎧 Listen for login/logout
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -41,65 +28,54 @@ export default function App() {
       }
     });
 
-    // 🔁 Refresh on tab focus
-    const refreshOnFocus = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (!error && data.session?.user) {
-        console.log("🔄 Session revalidated on focus");
-        setProfile(data.session.user);
-      }
-    };
-    window.addEventListener("focus", refreshOnFocus);
+    // ✅ Once Supabase has checked session, unlock router
+    const timer = setTimeout(() => {
+      console.log("🟢 App Ready: Router can safely mount now");
+      setReady(true);
+    }, 1200); // 1.2s guard ensures Supabase has fully hydrated
 
     return () => {
       console.log("🧹 Cleaning up Supabase listener...");
       subscription.unsubscribe();
-      window.removeEventListener("focus", refreshOnFocus);
+      clearTimeout(timer);
     };
   }, [setProfile, checkUser]);
 
- if (loading) {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-      <p className="text-lg animate-pulse">Authenticating your session...</p>
-    </div>
-  );
-}
-
-
-  // 🚨 2️⃣ Wrap routes in a try/catch error boundary (no more crash loop)
-  try {
+  // 🌀 Hold the app until both Supabase + Router are safe
+  if (loading || !ready) {
     return (
-      <HashRouter>
-        <RouteLogger />
-        {profile ? (
-          <Routes>
-            <Route path="/" element={<Navigate to="/network" replace />} />
-            <Route path="/network" element={<HomePage />} />
-            <Route path="/onboarding" element={<OnboardingPage />} />
-            <Route path="*" element={<Navigate to="/network" replace />} />
-          </Routes>
-        ) : (
-          <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/reset-password" element={<Login />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        )}
-      </HashRouter>
-    );
-  } catch (err) {
-    console.error("🚨 Router error:", err);
-    return (
-      <div className="min-h-screen flex items-center justify-center text-center bg-background text-foreground p-8">
-        <p className="text-red-400 text-lg font-bold mb-2">
-          An error occurred loading routes.
-        </p>
-        <p className="text-sm opacity-80">
-          Please refresh the page or sign in again.
-        </p>
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+        <p className="text-lg animate-pulse">Authenticating your session...</p>
       </div>
     );
   }
+
+  // ✅ Safe router rendering after hydration lock release
+  return (
+    <HashRouter>
+      <Routes>
+        {/* 🔁 Root redirect logic */}
+        <Route
+          path="/"
+          element={
+            profile ? <Navigate to="/network" replace /> : <Navigate to="/login" replace />
+          }
+        />
+        {/* 🔐 Protected routes */}
+        <Route
+          path="/network"
+          element={profile ? <HomePage /> : <Navigate to="/login" replace />}
+        />
+        <Route
+          path="/onboarding"
+          element={profile ? <OnboardingPage /> : <Navigate to="/login" replace />}
+        />
+        {/* 🔑 Auth routes */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/reset-password" element={<Login />} />
+        {/* 🧭 Catch-all redirect */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </HashRouter>
+  );
 }
