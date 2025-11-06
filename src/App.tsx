@@ -6,7 +6,7 @@ import OnboardingPage from "@/pages/OnboardingPage";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabaseClient";
 
-// 🧱 Error Boundary (global catch)
+// 🧱 Error Boundary
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean }
@@ -15,15 +15,12 @@ class ErrorBoundary extends React.Component<
     super(props);
     this.state = { hasError: false };
   }
-
   static getDerivedStateFromError() {
     return { hasError: true };
   }
-
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error("💥 Caught error in boundary:", error, info);
   }
-
   render() {
     if (this.state.hasError) {
       return (
@@ -42,29 +39,35 @@ class ErrorBoundary extends React.Component<
         </div>
       );
     }
-
     return this.props.children;
   }
 }
 
-// 🧩 SafeRender wrapper for per-component crash tracking
-function SafeRender({ children, name }: { children: React.ReactNode; name: string }) {
-  try {
-    return <>{children}</>;
-  } catch (err) {
-    console.error(`💥 Render failed in ${name}:`, err);
-    return (
-      <div className="text-red-400 text-center mt-20">
-        <p>Component "{name}" failed to render.</p>
-      </div>
-    );
-  }
+// 🧩 Router isolated for safe mount
+function AppRouter() {
+  const { profile } = useAuthStore();
+
+  return (
+    <Routes>
+      <Route path="/" element={<Login />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/reset-password" element={<Login />} />
+      <Route
+        path="/network"
+        element={profile ? <HomePage /> : <Login />}
+      />
+      <Route
+        path="/onboarding"
+        element={profile ? <OnboardingPage /> : <Login />}
+      />
+      <Route path="*" element={<Login />} />
+    </Routes>
+  );
 }
 
 export default function App() {
   const { checkUser, setProfile } = useAuthStore();
-  const [loading, setLoading] = useState(true);
-  const [routerReady, setRouterReady] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     console.log("🧠 Initializing Supabase auth handling...");
@@ -72,13 +75,10 @@ export default function App() {
     const init = async () => {
       console.log("🔍 Checking Supabase session...");
       await checkUser();
-      setLoading(false);
     };
     init();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("🔄 Supabase auth event:", event);
       if (session?.user) {
         console.log("✅ Logged in:", session.user.email);
@@ -89,10 +89,11 @@ export default function App() {
       }
     });
 
+    // 🕓 Give router time to safely hydrate
     const timer = setTimeout(() => {
-      console.log("🟢 App Ready: Router safe to mount");
-      setRouterReady(true);
-    }, 500);
+      console.log("🟢 Router safe to mount");
+      setReady(true);
+    }, 800);
 
     return () => {
       subscription.unsubscribe();
@@ -100,7 +101,7 @@ export default function App() {
     };
   }, [checkUser, setProfile]);
 
-  if (loading || !routerReady) {
+  if (!ready) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
         <p className="text-lg animate-pulse">Authenticating your session...</p>
@@ -108,67 +109,11 @@ export default function App() {
     );
   }
 
-  // 🧩 Full app render
+  // ✅ Render router inside boundary
   return (
     <HashRouter>
       <ErrorBoundary>
-        <Routes>
-          {/* Root */}
-          <Route
-            path="/"
-            element={
-              <SafeRender name="Login">
-                <Login />
-              </SafeRender>
-            }
-          />
-
-          {/* Public */}
-          <Route
-            path="/login"
-            element={
-              <SafeRender name="Login">
-                <Login />
-              </SafeRender>
-            }
-          />
-          <Route
-            path="/reset-password"
-            element={
-              <SafeRender name="ResetPassword">
-                <Login />
-              </SafeRender>
-            }
-          />
-
-          {/* Protected */}
-          <Route
-            path="/network"
-            element={
-              <SafeRender name="HomePage">
-                <HomePage />
-              </SafeRender>
-            }
-          />
-          <Route
-            path="/onboarding"
-            element={
-              <SafeRender name="OnboardingPage">
-                <OnboardingPage />
-              </SafeRender>
-            }
-          />
-
-          {/* Fallback */}
-          <Route
-            path="*"
-            element={
-              <SafeRender name="Fallback">
-                <Login />
-              </SafeRender>
-            }
-          />
-        </Routes>
+        <AppRouter />
       </ErrorBoundary>
     </HashRouter>
   );
