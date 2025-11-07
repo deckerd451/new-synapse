@@ -1,142 +1,120 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
-import { useAuthStore } from "@/stores/authStore";
-import { toast } from "sonner";
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+import { useAuthStore } from '@/stores/authStore';
+import { toast } from 'sonner';
 
 /**
- * ProfilePage allows a logged‑in user to view and edit their community profile.
- * It loads the current profile from the auth store and lets the user update
- * their display name, bio and skills.  When the save button is clicked the
- * changes are persisted to the Supabase `community` table and the local
- * store is updated with the fresh data.
+ * ProfilePage allows an authenticated user to view and edit their
+ * community profile.  The form is pre-populated with the current
+ * profile data.  On submit the community table is updated and
+ * local state is refreshed.  If no profile is present the user is
+ * informed accordingly.
  */
 export default function ProfilePage() {
   const { profile, setProfile } = useAuthStore();
-  const [name, setName] = useState("");
-  const [bio, setBio] = useState("");
-  const [skills, setSkills] = useState("");
+  const [form, setForm] = useState({
+    name: '',
+    bio: '',
+    skills: '',
+  });
   const [loading, setLoading] = useState(false);
-  // Provide navigation so users can return to the network/dashboard page
-  const navigate = useNavigate();
 
-  // Populate form fields when the profile becomes available.
+  // Populate form when profile becomes available
   useEffect(() => {
     if (profile) {
-      setName(profile.name ?? "");
-      setBio(profile.bio ?? "");
-      // Convert an array of skills back into a comma‑separated list for editing.
-      if (Array.isArray(profile.skills)) {
-        setSkills(profile.skills.join(", "));
-      } else if (typeof profile.skills === "string") {
-        setSkills(profile.skills);
-      } else {
-        setSkills("");
-      }
+      setForm({
+        name: profile.name ?? '',
+        bio: profile.bio ?? '',
+        skills: Array.isArray(profile.skills)
+          ? (profile.skills as string[]).join(', ')
+          : (profile.skills as string) ?? '',
+      });
     }
   }, [profile]);
 
-  // Save the updated profile values to the database.
-  async function handleSave() {
-    if (!profile) return;
+  if (!profile) {
+    return (
+      <div className="p-4">
+        <h1 className="text-xl font-bold">Profile</h1>
+        <p>Loading profile…</p>
+      </div>
+    );
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setLoading(true);
     try {
-      // Convert the skills input back into a comma‑separated string.  Trim
-      // whitespace and drop empty segments.
-      const skillsList = skills
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .join(", ");
-
       const updates = {
-        name: name || null,
-        bio: bio || null,
-        skills: skillsList || null,
-      };
-      // Persist changes to the community table.  Only update valid columns.
-      const { error } = await supabase
-        .from("community")
+        name: form.name,
+        bio: form.bio,
+        skills: form.skills,
+      } as Record<string, any>;
+      const { data, error } = await supabase
+        .from('community')
         .update(updates)
-        .eq("id", profile.id);
+        .eq('id', profile.id)
+        .select('*')
+        .maybeSingle();
       if (error) {
         toast.error(error.message);
-        return;
-      }
-      // Reload the updated profile and hydrate the store.
-      const { data: refreshed, error: fetchError } = await supabase
-        .from("community")
-        .select("*")
-        .eq("id", profile.id)
-        .maybeSingle();
-      if (fetchError) {
-        toast.error(fetchError.message);
-        return;
-      }
-      if (refreshed) {
-        setProfile(refreshed);
-        toast.success("Profile updated!");
+      } else if (data) {
+        toast.success('Profile updated successfully.');
+        setProfile(data);
       }
     } finally {
       setLoading(false);
     }
   }
 
-  if (!profile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
-        <p>Loading profile…</p>
-      </div>
-    );
-  }
-
   return (
-        <div className="flex flex-col p-4 space-y-4 max-w-md mx-auto">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">Profile</h1>
-            {/* Back button allows users to navigate back to the network/dashboard */}
-            <button
-              onClick={() => navigate("/network")}
-              className="text-sm underline text-cyan-400 hover:text-cyan-300"
-            >
-              Back to network
-            </button>
-          </div>
-      <label className="block">
-        <span className="block text-sm font-medium">Display Name</span>
-        <input
-          type="text"
-          className="w-full mt-1 p-2 border rounded bg-transparent text-foreground"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </label>
-      <label className="block">
-        <span className="block text-sm font-medium">Bio</span>
-        <textarea
-          className="w-full mt-1 p-2 border rounded bg-transparent text-foreground"
-          rows={3}
-          value={bio}
-          onChange={(e) => setBio(e.target.value)}
-        />
-      </label>
-      <label className="block">
-        <span className="block text-sm font-medium">Skills</span>
-        <input
-          type="text"
-          className="w-full mt-1 p-2 border rounded bg-transparent text-foreground"
-          placeholder="Enter skills separated by commas"
-          value={skills}
-          onChange={(e) => setSkills(e.target.value)}
-        />
-      </label>
-      <button
-        onClick={handleSave}
-        disabled={loading}
-        className="px-4 py-2 bg-gold text-black font-semibold rounded hover:bg-gold/90 transition disabled:opacity-50"
-      >
-        {loading ? "Saving…" : "Save Changes"}
-      </button>
+    <div className="p-4 max-w-xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Your Profile</h1>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="name" className="block text-sm font-medium mb-1">
+            Name
+          </label>
+          <input
+            id="name"
+            type="text"
+            className="w-full px-4 py-2 border rounded bg-transparent text-foreground focus:outline-none"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+        </div>
+        <div>
+          <label htmlFor="bio" className="block text-sm font-medium mb-1">
+            Bio
+          </label>
+          <textarea
+            id="bio"
+            className="w-full px-4 py-2 border rounded bg-transparent text-foreground focus:outline-none"
+            rows={4}
+            value={form.bio}
+            onChange={(e) => setForm({ ...form, bio: e.target.value })}
+          />
+        </div>
+        <div>
+          <label htmlFor="skills" className="block text-sm font-medium mb-1">
+            Skills (comma-separated)
+          </label>
+          <input
+            id="skills"
+            type="text"
+            className="w-full px-4 py-2 border rounded bg-transparent text-foreground focus:outline-none"
+            value={form.skills}
+            onChange={(e) => setForm({ ...form, skills: e.target.value })}
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="py-2 px-6 bg-gold text-black font-semibold rounded hover:bg-gold/90 transition"
+        >
+          {loading ? 'Saving…' : 'Save Changes'}
+        </button>
+      </form>
     </div>
   );
 }
