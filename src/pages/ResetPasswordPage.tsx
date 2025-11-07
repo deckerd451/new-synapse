@@ -4,17 +4,17 @@ import { useAuthStore } from "@/stores/authStore";
 import { toast } from "sonner";
 
 /**
- * ResetPasswordPage renders a form to allow users to set a new password
- * after following a password recovery link. On mount it exchanges the
- * Supabase URL code for a valid session, then calls checkUser() from the
- * auth store to hydrate the user profile. Once the session is active,
- * the user can enter a new password and submit the form.
+ * ResetPasswordPage renders a form for users to set a new password after following
+ * a password recovery link. On mount, it exchanges the Supabase recovery code
+ * from the URL for a valid session, then calls checkUser() from the auth store.
+ * Once the session is active, the user can enter a new password and submit it.
  */
 export default function ResetPasswordPage() {
   const { checkUser } = useAuthStore();
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // 🔄 Restore Supabase session from recovery link on mount
   useEffect(() => {
     const restoreSession = async () => {
       try {
@@ -37,6 +37,7 @@ export default function ResetPasswordPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 🔑 Handle password update form
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!password) return;
@@ -47,6 +48,8 @@ export default function ResetPasswordPage() {
         toast.error(error.message);
       } else {
         toast.success("Password updated successfully. You can now sign in.");
+        // ✅ Redirect to login page (HashRouter)
+        setTimeout(() => window.location.replace("/#/login"), 1500);
       }
     } finally {
       setLoading(false);
