@@ -23,6 +23,13 @@
       }
     })();
   </script>
+  <script>
+  const url = window.location.href;
+  if (url.includes("/reset-password") && !url.includes("/#/")) {
+    window.location.replace(url.replace("/reset-password", "/#/reset-password"));
+  }
+</script>
+
 
   <body>
     <!-- React mount point -->
