@@ -17,10 +17,21 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // On mount, attempt to restore the session using any tokens in the URL.
+  // On mount, attempt to restore the session from the URL.  Password recovery
+  // links may only include an access token or code, so use the built‑in
+  // helper to exchange it for a session and store it.  Afterwards, call
+  // checkUser() to hydrate the profile if necessary.
   useEffect(() => {
-    checkUser();
-  }, [checkUser]);
+    supabase.auth
+      .getSessionFromUrl({ storeSession: true })
+      .catch(() => {
+        /* no-op */
+      })
+      .finally(() => {
+        checkUser();
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
