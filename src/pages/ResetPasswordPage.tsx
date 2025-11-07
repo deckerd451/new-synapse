@@ -4,32 +4,34 @@ import { useAuthStore } from "@/stores/authStore";
 import { toast } from "sonner";
 
 /**
- * ResetPasswordPage renders a form for users to set a new password after following
- * a password recovery link. On mount, it exchanges the Supabase recovery code
- * from the URL for a valid session, then calls checkUser() from the auth store.
- * Once the session is active, the user can enter a new password and submit it.
+ * ResetPasswordPage
+ * Handles password recovery links from Supabase on GitHub Pages (HashRouter).
+ * Fixes the issue where the access_token is hidden behind the `#/` fragment
+ * by normalizing the URL before calling exchangeCodeForSession().
  */
 export default function ResetPasswordPage() {
   const { checkUser } = useAuthStore();
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // 🔄 Restore Supabase session from recovery link on mount
+  // 🔄 Restore session from Supabase recovery link
   useEffect(() => {
     const restoreSession = async () => {
       try {
-        // ✅ New Supabase v2 method — replaces getSessionFromUrl()
-        const { data, error } = await supabase.auth.exchangeCodeForSession(window.location.href);
+        // ⚙️ Fix for GitHub Pages + HashRouter:
+        // Supabase expects the token in the hash, but HashRouter adds its own `#/`.
+        const normalizedUrl = window.location.href.replace("/#/", "/");
 
+        const { data, error } = await supabase.auth.exchangeCodeForSession(normalizedUrl);
         if (error) {
-          console.error("Error exchanging code for session:", error.message);
+          console.error("❌ Error exchanging code for session:", error.message);
         } else if (data?.session) {
-          console.log("✅ Session restored:", data.session);
+          console.log("✅ Session restored:", data.session.user?.email);
         }
       } catch (err) {
         console.error("Unexpected error restoring session:", err);
       } finally {
-        checkUser();
+        checkUser(); // hydrate profile if session was restored
       }
     };
 
@@ -48,7 +50,7 @@ export default function ResetPasswordPage() {
         toast.error(error.message);
       } else {
         toast.success("Password updated successfully. You can now sign in.");
-        // ✅ Redirect to login page (HashRouter)
+        // ✅ Redirect to login (HashRouter form)
         setTimeout(() => window.location.replace("/#/login"), 1500);
       }
     } finally {
