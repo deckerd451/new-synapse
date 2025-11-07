@@ -1,45 +1,52 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
-import { useAuthStore } from "@/stores/authStore";
-import { toast } from "sonner";
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+import { useAuthStore } from '@/stores/authStore';
+import { toast } from 'sonner';
 
 /**
- * ResetPasswordPage
- * Handles password recovery links from Supabase on GitHub Pages (HashRouter).
- * Fixes the issue where the access_token is hidden behind the `#/` fragment
- * by normalizing the URL before calling exchangeCodeForSession().
+ * ResetPasswordPage renders a form allowing the user to set a new
+ * password after following a password recovery link.  On mount the
+ * component attempts to exchange any recovery code present in the URL
+ * for a valid session.  If the session cannot be restored an error
+ * message is displayed.  Otherwise the user can enter a new password
+ * and submit the form.
  */
 export default function ResetPasswordPage() {
   const { checkUser } = useAuthStore();
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sessionChecked, setSessionChecked] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
 
-  // 🔄 Restore session from Supabase recovery link
+  // Attempt to restore the session from the URL when the component mounts.
   useEffect(() => {
     const restoreSession = async () => {
       try {
-        // ⚙️ Fix for GitHub Pages + HashRouter:
-        // Supabase expects the token in the hash, but HashRouter adds its own `#/`.
-        const normalizedUrl = window.location.href.replace("/#/", "/");
-
-        const { data, error } = await supabase.auth.exchangeCodeForSession(normalizedUrl);
+        // Normalise the URL when using HashRouter so that the recovery
+        // token appears after a single '#'.  Supabase expects the
+        // token in the fragment for PKCE flows.  Without this fix
+        // GitHub Pages / HashRouter adds '/#/' which hides the token.
+        const normalizedUrl = window.location.href.replace('/#/', '/');
+        const { error } = await supabase.auth.exchangeCodeForSession(normalizedUrl);
         if (error) {
-          console.error("❌ Error exchanging code for session:", error.message);
-        } else if (data?.session) {
-          console.log("✅ Session restored:", data.session.user?.email);
+          console.error('Error exchanging code for session:', error.message);
         }
-      } catch (err) {
-        console.error("Unexpected error restoring session:", err);
-      } finally {
-        checkUser(); // hydrate profile if session was restored
+      } catch (err: any) {
+        console.error('Unexpected error exchanging code for session:', err);
       }
+      // After attempting exchange, refresh local state
+      await checkUser();
+      // Inspect whether a session is present
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        setSessionError('Invalid or expired password reset link. Please request a new reset email.');
+      }
+      setSessionChecked(true);
     };
-
     restoreSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 🔑 Handle password update form
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!password) return;
@@ -49,22 +56,41 @@ export default function ResetPasswordPage() {
       if (error) {
         toast.error(error.message);
       } else {
-        toast.success("Password updated successfully. You can now sign in.");
-        // ✅ Redirect to login (HashRouter form)
-        setTimeout(() => window.location.replace("/#/login"), 1500);
+        toast.success('Password updated successfully. You can now sign in.');
+        // Redirect to login after a short delay.  Use HashRouter form
+        setTimeout(() => {
+          window.location.replace('/#/login');
+        }, 1500);
       }
     } finally {
       setLoading(false);
     }
   }
 
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
+        <p>Authenticating your session…</p>
+      </div>
+    );
+  }
+  if (sessionError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-4">
+        <div className="max-w-md text-center space-y-4">
+          <h1 className="text-xl font-bold">Reset Password</h1>
+          <p>{sessionError}</p>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen flex items-center justify-center bg-background text-foreground">
       <form
         onSubmit={handleSubmit}
         className="p-6 bg-card rounded shadow w-full max-w-sm space-y-4"
       >
-        <h1 className="text-2xl font-bold text-center">Synapse Link</h1>
+        <h1 className="text-2xl font-bold text-center">Set New Password</h1>
         <input
           type="password"
           className="w-full px-4 py-2 border rounded bg-transparent text-foreground focus:outline-none"
@@ -78,7 +104,7 @@ export default function ResetPasswordPage() {
           disabled={loading}
           className="w-full py-2 bg-gold text-black font-semibold rounded hover:bg-gold/90 transition"
         >
-          {loading ? "Updating…" : "Update Password"}
+          {loading ? 'Updating…' : 'Update Password'}
         </button>
       </form>
     </div>
