@@ -160,20 +160,36 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             const url = new URL(window.location.href);
             const accessToken = url.searchParams.get("access_token");
             const refreshToken = url.searchParams.get("refresh_token");
-            if (accessToken && refreshToken) {
-              console.log("🔄 Restoring session from URL tokens...");
-              const { error: setSessionError } = await supabase.auth.setSession({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-              });
-              if (setSessionError) {
-                console.error(
-                  "❌ Failed to set session from URL:",
-                  setSessionError,
-                );
+            const hasRecovery = url.searchParams.get("type") === "recovery";
+            try {
+              if (accessToken && refreshToken) {
+                // Full session restoration (e.g. magic‑link flow)
+                console.log("🔄 Restoring session from URL tokens…");
+                const { error: setSessionError } = await supabase.auth.setSession({
+                  access_token: accessToken,
+                  refresh_token: refreshToken,
+                });
+                if (setSessionError) {
+                  console.error(
+                    "❌ Failed to set session from URL:",
+                    setSessionError,
+                  );
+                }
+              } else if (accessToken || hasRecovery) {
+                // Password recovery links may only include an access token
+                console.log("🔄 Exchanging URL tokens for a session…");
+                const { error: exchangeError } = await supabase.auth.getSessionFromUrl({
+                  storeSession: true,
+                });
+                if (exchangeError) {
+                  console.error(
+                    "❌ Failed to exchange code for session:",
+                    exchangeError,
+                  );
+                }
               }
-              // Clean up the query parameters so this logic doesn't run again on
-              // every navigation.  Preserve the existing hash fragment.
+            } finally {
+              // Clean up any auth query parameters so we don't repeatedly parse them
               url.searchParams.delete("access_token");
               url.searchParams.delete("refresh_token");
               url.searchParams.delete("type");
