@@ -81,40 +81,46 @@ async function ensureCommunityUser(user: any): Promise<CommunityProfile | null> 
     );
   }
   try {
-    // Insert a minimal community row.  Do not reference any optional columns
-    // such as `role` because those may not exist in the database yet.  Only
-    // supply id, email and a derived name.  Use `insert` without a
-    // subsequent `select` to avoid 409 conflicts being surfaced as errors.
-    const { error: insertError } = await supabase.from("community").insert([
-      {
-        id: user.id,
-        email: user.email,
-        name: user.email?.split("@")[0] ?? null,
-      },
-    ]);
-    if (insertError) {
-      // If a conflict occurs (status 409) it likely means the row already
-      // exists.  We'll ignore the error and attempt to load the existing row
-      // again below.
+    /*
+     * Upsert a minimal community row.  The `onConflict` option ensures we
+     * don't violate the unique constraint on email, and `ignoreDuplicates`
+     * prevents existing rows from being updated.  This approach avoids
+     * repeated 409 (duplicate key) errors when multiple sign‑ins occur.
+     */
+    const { error: upsertError } = await supabase
+      .from("community")
+      .upsert(
+        [
+          {
+            id: user.id,
+            email: user.email,
+            name: user.email?.split("@")[0] ?? null,
+          },
+        ],
+        {
+          onConflict: "email",
+          ignoreDuplicates: true,
+        },
+      );
+    if (upsertError) {
       console.warn(
-        "⚠️ Ignoring error while creating community profile:",
-        insertError,
+        "⚠️ Ignoring error while upserting community profile:",
+        upsertError,
       );
     }
-    // Whether insert succeeded or not, attempt to load the profile again.  If
-    // it still doesn't exist, return a minimal record derived from the user.
+    // Whether upsert succeeded or not, attempt to load the profile again.
     const { data: profile, error: fetchError } = await supabase
       .from("community")
       .select("*")
       .eq("id", user.id)
       .maybeSingle();
     if (profile && !fetchError) {
-      console.log("Created new community profile:", profile.email);
+      console.log("Created or loaded community profile:", profile.email);
       return profile as CommunityProfile;
     }
   } catch (err) {
     console.warn(
-      "⚠️ Ignoring error while inserting/fetching community profile:",
+      "⚠️ Ignoring error while upserting/fetching community profile:",
       err,
     );
   }
