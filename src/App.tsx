@@ -4,6 +4,7 @@ import { Login } from "@/components/auth/Login";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import HomePage from "@/pages/HomePage";
 import OnboardingPage from "@/pages/OnboardingPage";
+import ProfilePage from "@/pages/ProfilePage";
 import { useAuthStore } from "@/stores/authStore";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -68,7 +69,9 @@ function AppRouter() {
            * and then allowing the user to set a new password.
            */}
           <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/network" element={profile ? <HomePage /> : <Login />} />
+          <Route path="/network" element={profile ? <HomePage /> : <Login />} />
+          {/* Profile editing route; requires an authenticated profile */}
+          <Route path="/profile" element={profile ? <ProfilePage /> : <Login />} />
       <Route
         path="/onboarding"
         element={profile ? <OnboardingPage /> : <Login />}
