@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuthStore } from "@/stores/authStore";
 import { toast } from "sonner";
@@ -16,6 +17,8 @@ export default function ProfilePage() {
   const [bio, setBio] = useState("");
   const [skills, setSkills] = useState("");
   const [loading, setLoading] = useState(false);
+  // Provide navigation so users can return to the network/dashboard page
+  const navigate = useNavigate();
 
   // Populate form fields when the profile becomes available.
   useEffect(() => {
@@ -88,8 +91,17 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="flex flex-col p-4 space-y-4 max-w-md mx-auto">
-      <h1 className="text-2xl font-bold">Profile</h1>
+        <div className="flex flex-col p-4 space-y-4 max-w-md mx-auto">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold">Profile</h1>
+            {/* Back button allows users to navigate back to the network/dashboard */}
+            <button
+              onClick={() => navigate("/network")}
+              className="text-sm underline text-cyan-400 hover:text-cyan-300"
+            >
+              Back to network
+            </button>
+          </div>
       <label className="block">
         <span className="block text-sm font-medium">Display Name</span>
         <input
