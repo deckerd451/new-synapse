@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
-import { useAuthStore } from '@/stores/authStore';
-import { toast } from 'sonner';
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import { useAuthStore } from "@/stores/authStore";
+import { toast } from "sonner";
 
 /**
  * ProfilePage allows an authenticated user to view and edit their
@@ -11,11 +11,11 @@ import { toast } from 'sonner';
  * informed accordingly.
  */
 export default function ProfilePage() {
-  const { profile, setProfile } = useAuthStore();
+  const { profile, setProfile, signOut } = useAuthStore();
   const [form, setForm] = useState({
-    name: '',
-    bio: '',
-    skills: '',
+    name: "",
+    bio: "",
+    skills: "",
   });
   const [loading, setLoading] = useState(false);
 
@@ -23,11 +23,11 @@ export default function ProfilePage() {
   useEffect(() => {
     if (profile) {
       setForm({
-        name: profile.name ?? '',
-        bio: profile.bio ?? '',
+        name: profile.name ?? "",
+        bio: profile.bio ?? "",
         skills: Array.isArray(profile.skills)
-          ? (profile.skills as string[]).join(', ')
-          : (profile.skills as string) ?? '',
+          ? (profile.skills as string[]).join(", ")
+          : (profile.skills as string) ?? "",
       });
     }
   }, [profile]);
@@ -51,15 +51,15 @@ export default function ProfilePage() {
         skills: form.skills,
       } as Record<string, any>;
       const { data, error } = await supabase
-        .from('community')
+        .from("community")
         .update(updates)
-        .eq('id', profile.id)
-        .select('*')
+        .eq("id", profile.id)
+        .select("*")
         .maybeSingle();
       if (error) {
         toast.error(error.message);
       } else if (data) {
-        toast.success('Profile updated successfully.');
+        toast.success("Profile updated successfully.");
         setProfile(data);
       }
     } finally {
@@ -112,9 +112,29 @@ export default function ProfilePage() {
           disabled={loading}
           className="py-2 px-6 bg-gold text-black font-semibold rounded hover:bg-gold/90 transition"
         >
-          {loading ? 'Saving…' : 'Save Changes'}
+          {loading ? "Saving…" : "Save Changes"}
         </button>
       </form>
+
+      {/* Navigation buttons */}
+      <div className="mt-6 flex gap-4">
+        <button
+          onClick={() => (window.location.hash = "#/search")}
+          className="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-600 transition"
+        >
+          Go to Search
+        </button>
+
+        <button
+          onClick={async () => {
+            await signOut();
+            window.location.hash = "#/login";
+          }}
+          className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-500 transition"
+        >
+          Log Out
+        </button>
+      </div>
     </div>
   );
 }
