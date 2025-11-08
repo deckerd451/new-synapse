@@ -14,12 +14,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // If a profile is already present navigate to the profile page.
-  useEffect(() => {
-    if (profile) {
-      navigate('/profile');
-    }
-  }, [profile, navigate]);
+      // If a profile is already present navigate to the dashboard home page.
+      useEffect(() => {
+        if (profile) {
+          navigate('/');
+        }
+      }, [profile, navigate]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
