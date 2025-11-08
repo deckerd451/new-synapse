@@ -13,12 +13,12 @@ export default function SignUpPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (profile) {
-      navigate('/profile');
-    }
-  }, [profile, navigate]);
+      // Redirect to dashboard if already authenticated
+      useEffect(() => {
+        if (profile) {
+          navigate('/');
+        }
+      }, [profile, navigate]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
