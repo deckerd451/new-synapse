@@ -8,6 +8,7 @@ import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import ProfilePage from '@/pages/ProfilePage';
 import SearchPage from '@/pages/SearchPage';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import HomePage from '@/pages/HomePage';
 
 /**
  * App configures the client-side routing for the Synapse Link application.
