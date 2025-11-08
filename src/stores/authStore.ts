@@ -182,11 +182,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                   );
                 }
               } else if (accessToken || hasRecovery) {
-                // Password recovery links may only include an access token
-                console.log("🔄 Exchanging URL tokens for a session…");
-                const { error: exchangeError } = await supabase.auth.getSessionFromUrl({
-                  storeSession: true,
-                });
+                // Password recovery links may only include an access token or specify a
+                // recovery type.  When using Supabase v2 the old
+                // `getSessionFromUrl` helper has been removed.  Instead we call
+                // `exchangeCodeForSession()` with the full URL to exchange the code
+                // and persist the session.  Normalize the URL to account for
+                // HashRouter (#/) so that the token appears after a single '#'.
+                console.log("🔄 Exchanging code for session…");
+                const normalizedUrl = window.location.href.replace('/#/', '/');
+                const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(
+                  normalizedUrl,
+                );
                 if (exchangeError) {
                   console.error(
                     "❌ Failed to exchange code for session:",
