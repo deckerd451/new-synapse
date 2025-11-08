@@ -6,9 +6,8 @@ import SignUpPage from '@/pages/SignUpPage';
 import ResetPasswordRequestPage from '@/pages/ResetPasswordRequestPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import ProfilePage from '@/pages/ProfilePage';
-import SearchPage from '@/pages/SearchPage';
-import ProtectedRoute from '@/components/ProtectedRoute';
 import HomePage from '@/pages/HomePage';
+import ProtectedRoute from '@/components/ProtectedRoute';
 
 /**
  * App configures the client-side routing for the Synapse Link application.
@@ -34,7 +33,16 @@ export default function App() {
         <Route path="/forgot-password" element={<ResetPasswordRequestPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-        {/* Protected routes */}
+        {/* Protected dashboard route — renders HomePage for authenticated users */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <HomePage />
+            </ProtectedRoute>
+          }
+        />
+        {/* Optionally keep a standalone profile editor; dashboard has its own profile tab */}
         <Route
           path="/profile"
           element={
@@ -43,18 +51,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/search"
-          element={
-            <ProtectedRoute>
-              <SearchPage />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Default route */}
-        <Route path="/" element={<Navigate to="/profile" replace />} />
-        {/* Catch-all for unknown routes */}
+        {/* Catch-all for unknown routes — redirect to dashboard */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </HashRouter>
