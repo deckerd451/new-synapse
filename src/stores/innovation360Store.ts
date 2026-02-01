@@ -8,6 +8,12 @@ interface Innovation360State {
   isRingRotating: boolean;
   currentRotation: number;
 
+  // Animation & Interaction State
+  interactionContext: 'ring' | 'sidebar' | null;
+  lastInteractionTime: number;
+  isOrientationAnimating: boolean;
+  justAdvancedStage: boolean;
+
   // Project Management
   projects: InnovationProject[];
   activeProjectId: string | null;
@@ -16,6 +22,12 @@ interface Innovation360State {
   setSelectedStage: (stageId: number | null) => void;
   setRingRotating: (rotating: boolean) => void;
   setRotation: (degrees: number) => void;
+
+  // Interaction Actions
+  setInteractionContext: (context: 'ring' | 'sidebar' | null) => void;
+  updateLastInteraction: () => void;
+  setOrientationAnimating: (animating: boolean) => void;
+  setJustAdvancedStage: (advanced: boolean) => void;
 
   // Project Actions
   addProject: (project: Omit<InnovationProject, 'id' | 'createdAt' | 'updatedAt'>) => void;
@@ -32,6 +44,12 @@ export const useInnovation360Store = create<Innovation360State>()(
       selectedStageId: null,
       isRingRotating: false,
       currentRotation: 0,
+
+      // Animation & Interaction State
+      interactionContext: null,
+      lastInteractionTime: Date.now(),
+      isOrientationAnimating: false,
+      justAdvancedStage: false,
 
       // Initial Project State
       projects: [
@@ -75,6 +93,12 @@ export const useInnovation360Store = create<Innovation360State>()(
       setSelectedStage: (stageId) => set({ selectedStageId: stageId }),
       setRingRotating: (rotating) => set({ isRingRotating: rotating }),
       setRotation: (degrees) => set({ currentRotation: degrees }),
+
+      // Interaction Actions
+      setInteractionContext: (context) => set({ interactionContext: context, lastInteractionTime: Date.now() }),
+      updateLastInteraction: () => set({ lastInteractionTime: Date.now(), isRingRotating: false }),
+      setOrientationAnimating: (animating) => set({ isOrientationAnimating: animating }),
+      setJustAdvancedStage: (advanced) => set({ justAdvancedStage: advanced }),
 
       // Project Actions
       addProject: (projectData) => {
@@ -126,7 +150,13 @@ export const useInnovation360Store = create<Innovation360State>()(
                 }
               : p
           ),
+          justAdvancedStage: true,
         }));
+
+        // Reset animation state after animation completes
+        setTimeout(() => {
+          set({ justAdvancedStage: false });
+        }, 600);
       },
     }),
     {
