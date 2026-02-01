@@ -23,6 +23,7 @@ export function ProjectSidebar({ onClose }: ProjectSidebarProps) {
     activeProjectId,
     interactionContext,
     setActiveProject,
+    setHoveredProject,
     setInteractionContext,
     updateLastInteraction,
     addProject,
@@ -66,6 +67,11 @@ export function ProjectSidebar({ onClose }: ProjectSidebarProps) {
     updateLastInteraction();
     setInteractionContext('sidebar');
     setActiveProject(activeProjectId === projectId ? null : projectId);
+  };
+
+  const handleProjectHover = (projectId: string | null) => {
+    // On hover, show project-specific state on the ring
+    setHoveredProject(projectId);
   };
 
   const handleSidebarInteraction = () => {
@@ -184,6 +190,8 @@ export function ProjectSidebar({ onClose }: ProjectSidebarProps) {
                         : 'hover:shadow-md hover:bg-accent/20'
                     )}
                     onClick={() => handleProjectClick(project.id)}
+                    onMouseEnter={() => handleProjectHover(project.id)}
+                    onMouseLeave={() => handleProjectHover(null)}
                   >
                     {/* Project Header */}
                     <div className="flex items-start justify-between mb-2">

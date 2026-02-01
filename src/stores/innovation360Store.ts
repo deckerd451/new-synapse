@@ -17,6 +17,7 @@ interface Innovation360State {
   // Project Management
   projects: InnovationProject[];
   activeProjectId: string | null;
+  hoveredProjectId: string | null;
 
   // Actions
   setSelectedStage: (stageId: number | null) => void;
@@ -34,6 +35,7 @@ interface Innovation360State {
   updateProject: (id: string, updates: Partial<InnovationProject>) => void;
   deleteProject: (id: string) => void;
   setActiveProject: (id: string | null) => void;
+  setHoveredProject: (id: string | null) => void;
   advanceProjectStage: (projectId: string, stageId: number) => void;
 }
 
@@ -88,6 +90,7 @@ export const useInnovation360Store = create<Innovation360State>()(
         },
       ],
       activeProjectId: null,
+      hoveredProjectId: null,
 
       // UI Actions
       setSelectedStage: (stageId) => set({ selectedStageId: stageId }),
@@ -131,6 +134,7 @@ export const useInnovation360Store = create<Innovation360State>()(
       },
 
       setActiveProject: (id) => set({ activeProjectId: id }),
+      setHoveredProject: (id) => set({ hoveredProjectId: id }),
 
       advanceProjectStage: (projectId, stageId) => {
         const { projects } = get();

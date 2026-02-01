@@ -22,6 +22,7 @@ export function CircularRing({ radius = 280, onStageClick }: CircularRingProps) 
     currentRotation,
     projects,
     activeProjectId,
+    hoveredProjectId,
     interactionContext,
     lastInteractionTime,
     isOrientationAnimating,
@@ -31,7 +32,9 @@ export function CircularRing({ radius = 280, onStageClick }: CircularRingProps) 
     setOrientationAnimating,
   } = useInnovation360Store();
 
-  const activeProject = projects.find((p) => p.id === activeProjectId);
+  // Display project: prioritize hovered over active
+  const displayProjectId = hoveredProjectId || activeProjectId;
+  const activeProject = projects.find((p) => p.id === displayProjectId);
   const [shouldPulse, setShouldPulse] = useState(false);
   const [prevActiveProjectId, setPrevActiveProjectId] = useState<string | null>(null);
 
@@ -277,6 +280,7 @@ export function CircularRing({ radius = 280, onStageClick }: CircularRingProps) 
               isCompleted={isCompleted}
               shouldPulse={shouldPulse && isActive}
               justCompleted={justCompleted}
+              hasActiveProject={!!activeProject}
               onClick={() => handleStageClick(stage.id)}
             />
           );

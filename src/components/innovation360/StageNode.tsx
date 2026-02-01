@@ -13,6 +13,7 @@ interface StageNodeProps {
   radius: number;
   shouldPulse?: boolean;
   justCompleted?: boolean;
+  hasActiveProject: boolean; // NEW: indicates if any project is selected
 }
 
 export function StageNode({
@@ -25,6 +26,7 @@ export function StageNode({
   radius,
   shouldPulse = false,
   justCompleted = false,
+  hasActiveProject,
 }: StageNodeProps) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -34,13 +36,25 @@ export function StageNode({
 
   const color = DEPARTMENT_COLORS[stage.department];
 
-  // Determine visual state and size
-  const baseSize = 70;
-  const isFuture = !isActive && !isCompleted;
+  // Determine stage status for rendering
+  // CRITICAL: Mutually exclusive states
+  const stageStatus = (() => {
+    if (!hasActiveProject) return 'neutral'; // Initial state: all dashed
+    if (isCompleted || isActive) return 'reached'; // Solid
+    return 'pending'; // Dashed
+  })();
 
+  // Visual properties based on status
+  const baseSize = 70;
   let nodeSize = baseSize;
-  if (isActive) nodeSize = baseSize * 1.25; // Active is larger
-  if (isSelected) nodeSize = baseSize * 1.4; // Selected is largest
+  if (isActive && hasActiveProject) nodeSize = baseSize * 1.25;
+  if (isSelected) nodeSize = baseSize * 1.4;
+
+  // Determine if this circle should be dashed
+  const isDashed = stageStatus === 'neutral' || stageStatus === 'pending';
+
+  // Determine if this circle should be filled
+  const isFilled = stageStatus === 'reached';
 
   // Get stage context for tooltip
   const stageContext = getStageContext(stage.id);
@@ -101,19 +115,23 @@ export function StageNode({
         </motion.div>
       )}
 
-      {/* Stage Node Circle */}
+      {/* Stage Node Circle - SINGLE SOURCE OF TRUTH */}
       <div
         className={cn(
-          'relative flex items-center justify-center rounded-full transition-all duration-300 border-3',
+          'relative flex items-center justify-center rounded-full transition-all duration-300',
           isSelected && 'ring-4 ring-white/40 ring-offset-4 ring-offset-background'
         )}
         style={{
           width: nodeSize,
           height: nodeSize,
-          backgroundColor: isFuture ? 'transparent' : color,
+          // Fill color based on status
+          backgroundColor: isFilled ? color : 'transparent',
+          // Border style: dashed or solid
+          borderWidth: '3px',
+          borderStyle: isDashed ? 'dashed' : 'solid',
           borderColor: color,
-          borderStyle: 'solid',
-          opacity: isFuture ? 0.5 : isCompleted ? 0.75 : 1,
+          // Opacity adjustments
+          opacity: stageStatus === 'neutral' ? 0.4 : stageStatus === 'pending' ? 0.5 : isCompleted ? 0.75 : 1,
           transform: `translateX(-50%) translateY(-50%)`,
         }}
       >
@@ -123,7 +141,7 @@ export function StageNode({
             <span
               className={cn(
                 'font-bold drop-shadow-lg transition-all',
-                isFuture ? 'text-muted-foreground' : 'text-white',
+                isFilled ? 'text-white' : 'text-muted-foreground',
                 isSelected ? 'text-2xl' : isActive ? 'text-xl' : 'text-lg'
               )}
             >
@@ -132,8 +150,8 @@ export function StageNode({
           </div>
         )}
 
-        {/* Completed Checkmark - Subtle */}
-        {isCompleted && (
+        {/* Completed Checkmark - Only show for completed stages when project is active */}
+        {isCompleted && hasActiveProject && (
           <motion.div
             initial={{ scale: 0, rotate: -180 }}
             animate={{ scale: 1, rotate: 0 }}
@@ -153,8 +171,8 @@ export function StageNode({
           </motion.div>
         )}
 
-        {/* Just Completed Animation - Brief celebration */}
-        {justCompleted && (
+        {/* Just Completed Animation */}
+        {justCompleted && hasActiveProject && (
           <motion.div
             className="absolute inset-0 rounded-full"
             style={{
@@ -172,8 +190,8 @@ export function StageNode({
           />
         )}
 
-        {/* Active Stage Pulse - Happens ONLY on project selection or stage advancement */}
-        {isActive && shouldPulse && (
+        {/* Active Stage Pulse - Only when project is selected */}
+        {isActive && shouldPulse && hasActiveProject && (
           <motion.div
             className="absolute inset-0 rounded-full"
             style={{
@@ -194,7 +212,7 @@ export function StageNode({
         )}
 
         {/* Active Stage Glow - Persistent but subtle */}
-        {isActive && !isFuture && (
+        {isActive && hasActiveProject && isFilled && (
           <div
             className="absolute inset-0 rounded-full blur-md opacity-40"
             style={{
@@ -204,8 +222,6 @@ export function StageNode({
           />
         )}
       </div>
-
-      {/* Stage Label removed - only shows on hover via tooltip */}
     </motion.div>
   );
 }
