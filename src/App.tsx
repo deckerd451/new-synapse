@@ -1,57 +1,19 @@
-import { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useAuthStore } from '@/stores/authStore';
-import LoginPage from '@/pages/LoginPage';
-import SignUpPage from '@/pages/SignUpPage';
-import ResetPasswordRequestPage from '@/pages/ResetPasswordRequestPage';
-import ResetPasswordPage from '@/pages/ResetPasswordPage';
-import ProfilePage from '@/pages/ProfilePage';
-import HomePage from '@/pages/HomePage';
-import ProtectedRoute from '@/components/ProtectedRoute';
+import Innovation360Page from '@/pages/Innovation360Page';
 
 /**
- * App configures the client-side routing for the Synapse Link application.
+ * App configures the client-side routing for the MUSC Innovation 360 application.
  * HashRouter is used to support static hosting (e.g. GitHub Pages) without
- * server-side route handling.  On mount the auth store's checkUser
- * function is invoked to hydrate the local session from Supabase.
+ * server-side route handling.
  */
 export default function App() {
-  const { checkUser } = useAuthStore();
-
-  // On application start, check for an existing session
-  useEffect(() => {
-    checkUser();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   return (
     <HashRouter>
       <Routes>
-        {/* Public routes */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignUpPage />} />
-        <Route path="/forgot-password" element={<ResetPasswordRequestPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        {/* Main Innovation 360 Interface */}
+        <Route path="/" element={<Innovation360Page />} />
 
-        {/* Protected dashboard route — renders HomePage for authenticated users */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <HomePage />
-            </ProtectedRoute>
-          }
-        />
-        {/* Optionally keep a standalone profile editor; dashboard has its own profile tab */}
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <ProfilePage />
-            </ProtectedRoute>
-          }
-        />
-        {/* Catch-all for unknown routes — redirect to dashboard */}
+        {/* Catch-all for unknown routes — redirect to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </HashRouter>
