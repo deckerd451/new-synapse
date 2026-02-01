@@ -104,9 +104,7 @@ export function StageNode({
       {/* Stage Node Circle */}
       <div
         className={cn(
-          'relative flex items-center justify-center rounded-full transition-all duration-300',
-          isFuture && 'border-4',
-          !isFuture && 'border-3',
+          'relative flex items-center justify-center rounded-full transition-all duration-300 border-3',
           isSelected && 'ring-4 ring-white/40 ring-offset-4 ring-offset-background'
         )}
         style={{
@@ -114,23 +112,25 @@ export function StageNode({
           height: nodeSize,
           backgroundColor: isFuture ? 'transparent' : color,
           borderColor: color,
-          borderStyle: isFuture ? 'dashed' : 'solid',
+          borderStyle: 'solid',
           opacity: isFuture ? 0.5 : isCompleted ? 0.75 : 1,
           transform: `translateX(-50%) translateY(-50%)`,
         }}
       >
-        {/* Stage Number */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span
-            className={cn(
-              'font-bold drop-shadow-lg transition-all',
-              isFuture ? 'text-muted-foreground' : 'text-white',
-              isSelected ? 'text-2xl' : isActive ? 'text-xl' : 'text-lg'
-            )}
-          >
-            {stage.id}
-          </span>
-        </div>
+        {/* Stage Number - only show on hover or selection */}
+        {(isHovered || isSelected) && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span
+              className={cn(
+                'font-bold drop-shadow-lg transition-all',
+                isFuture ? 'text-muted-foreground' : 'text-white',
+                isSelected ? 'text-2xl' : isActive ? 'text-xl' : 'text-lg'
+              )}
+            >
+              {stage.id}
+            </span>
+          </div>
+        )}
 
         {/* Completed Checkmark - Subtle */}
         {isCompleted && (
@@ -205,28 +205,7 @@ export function StageNode({
         )}
       </div>
 
-      {/* Stage Label - Only show if not selected and not hovered */}
-      {!isSelected && !isHovered && (
-        <motion.div
-          className="absolute top-full mt-2 w-28 text-center select-none"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: isFuture ? 0.5 : 0.85 }}
-          transition={{ delay: stage.id * 0.03 + 0.15 }}
-          style={{
-            left: '50%',
-            transform: 'translateX(-50%)',
-          }}
-        >
-          <p
-            className={cn(
-              'text-[10px] font-semibold leading-tight line-clamp-2',
-              isFuture ? 'text-muted-foreground' : 'text-foreground'
-            )}
-          >
-            {stage.title}
-          </p>
-        </motion.div>
-      )}
+      {/* Stage Label removed - only shows on hover via tooltip */}
     </motion.div>
   );
 }

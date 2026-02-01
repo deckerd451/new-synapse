@@ -34,7 +34,6 @@ export function CircularRing({ radius = 280, onStageClick }: CircularRingProps) 
   const activeProject = projects.find((p) => p.id === activeProjectId);
   const [shouldPulse, setShouldPulse] = useState(false);
   const [prevActiveProjectId, setPrevActiveProjectId] = useState<string | null>(null);
-  const [isIdleRotating, setIsIdleRotating] = useState(false);
 
   // Calculate angle for each stage (starting at top, going clockwise)
   const getAngleForStage = (stageId: number) => {
@@ -66,24 +65,6 @@ export function CircularRing({ radius = 280, onStageClick }: CircularRingProps) 
     }
   }, [activeProject?.id, activeProject?.currentStage]);
 
-  // Idle rotation - only starts after IDLE_TIMEOUT of no interaction
-  useEffect(() => {
-    const checkIdle = setInterval(() => {
-      const timeSinceInteraction = Date.now() - lastInteractionTime;
-      const shouldRotate = timeSinceInteraction > IDLE_TIMEOUT && !isOrientationAnimating;
-
-      // Respect prefers-reduced-motion
-      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-      if (shouldRotate && !prefersReducedMotion && !isRingRotating) {
-        setIsIdleRotating(true);
-      } else {
-        setIsIdleRotating(false);
-      }
-    }, 1000);
-
-    return () => clearInterval(checkIdle);
-  }, [lastInteractionTime, isOrientationAnimating, isRingRotating]);
 
   const handleStageClick = (stageId: number) => {
     updateLastInteraction();
@@ -238,7 +219,6 @@ export function CircularRing({ radius = 280, onStageClick }: CircularRingProps) 
             stroke="currentColor"
             strokeWidth="1"
             className="text-border opacity-20"
-            strokeDasharray="8 8"
           />
 
           {/* Progress Arc - cumulative, not animated unless changing */}
@@ -277,46 +257,31 @@ export function CircularRing({ radius = 280, onStageClick }: CircularRingProps) 
         </svg>
       </div>
 
-      {/* Idle Rotation Container */}
-      <motion.div
-        className="absolute inset-0"
-        animate={isIdleRotating ? { rotate: 360 } : { rotate: 0 }}
-        transition={
-          isIdleRotating
-            ? {
-                duration: 120,
-                repeat: Infinity,
-                ease: 'linear',
-              }
-            : { duration: 0 }
-        }
-      >
-        {/* Stage Nodes */}
-        <div className="absolute inset-0">
-          {INNOVATION_STAGES.map((stage) => {
-            const angle = getAngleForStage(stage.id);
-            const isSelected = selectedStageId === stage.id;
-            const isActive = activeProject?.currentStage === stage.id;
-            const isCompleted = activeProject?.completedStages.includes(stage.id);
-            const justCompleted = justAdvancedStage && isCompleted && activeProject?.completedStages[activeProject.completedStages.length - 1] === stage.id;
+      {/* Stage Nodes */}
+      <div className="absolute inset-0">
+        {INNOVATION_STAGES.map((stage) => {
+          const angle = getAngleForStage(stage.id);
+          const isSelected = selectedStageId === stage.id;
+          const isActive = activeProject?.currentStage === stage.id;
+          const isCompleted = activeProject?.completedStages.includes(stage.id);
+          const justCompleted = justAdvancedStage && isCompleted && activeProject?.completedStages[activeProject.completedStages.length - 1] === stage.id;
 
-            return (
-              <StageNode
-                key={stage.id}
-                stage={stage}
-                angle={angle}
-                radius={radius}
-                isSelected={isSelected}
-                isActive={isActive}
-                isCompleted={isCompleted}
-                shouldPulse={shouldPulse && isActive}
-                justCompleted={justCompleted}
-                onClick={() => handleStageClick(stage.id)}
-              />
-            );
-          })}
-        </div>
-      </motion.div>
+          return (
+            <StageNode
+              key={stage.id}
+              stage={stage}
+              angle={angle}
+              radius={radius}
+              isSelected={isSelected}
+              isActive={isActive}
+              isCompleted={isCompleted}
+              shouldPulse={shouldPulse && isActive}
+              justCompleted={justCompleted}
+              onClick={() => handleStageClick(stage.id)}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }

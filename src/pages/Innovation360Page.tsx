@@ -54,6 +54,16 @@ export default function Innovation360Page() {
       {/* Header */}
       <header className="absolute top-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3 bg-background/80 backdrop-blur-sm border-b border-border">
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 via-amber-500 to-pink-500 rounded-lg" />
+            <div>
+              <h1 className="text-base font-bold text-foreground">MUSC Innovation 360°</h1>
+              <p className="text-[10px] text-muted-foreground hidden sm:block">
+                Human-Centered Design Program
+              </p>
+            </div>
+          </div>
+
           <Button
             variant="ghost"
             size="icon"
@@ -65,16 +75,6 @@ export default function Innovation360Page() {
           >
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </Button>
-
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 via-amber-500 to-pink-500 rounded-lg" />
-            <div>
-              <h1 className="text-base font-bold text-foreground">MUSC Innovation 360°</h1>
-              <p className="text-[10px] text-muted-foreground hidden sm:block">
-                Human-Centered Design Program
-              </p>
-            </div>
-          </div>
         </div>
 
         <ThemeToggle />
