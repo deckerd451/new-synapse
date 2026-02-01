@@ -1,231 +1,322 @@
-import { useEffect, useRef } from 'react';
-import { motion, useAnimation } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
+import { motion, useAnimation, AnimatePresence } from 'framer-motion';
 import { StageNode } from './StageNode';
 import { INNOVATION_STAGES } from '@/types/innovation360';
 import { useInnovation360Store } from '@/stores/innovation360Store';
+import { cn } from '@/lib/utils';
 
 interface CircularRingProps {
   radius?: number;
   onStageClick?: (stageId: number) => void;
 }
 
+const IDLE_TIMEOUT = 15000; // 15 seconds before idle rotation starts
+
 export function CircularRing({ radius = 280, onStageClick }: CircularRingProps) {
-  const controls = useAnimation();
+  const sweepControls = useAnimation();
   const ringRef = useRef<HTMLDivElement>(null);
 
   const {
     selectedStageId,
     isRingRotating,
     currentRotation,
-    setRotation,
     projects,
     activeProjectId,
+    interactionContext,
+    lastInteractionTime,
+    isOrientationAnimating,
+    justAdvancedStage,
+    setInteractionContext,
+    updateLastInteraction,
+    setOrientationAnimating,
   } = useInnovation360Store();
 
   const activeProject = projects.find((p) => p.id === activeProjectId);
+  const [shouldPulse, setShouldPulse] = useState(false);
+  const [prevActiveProjectId, setPrevActiveProjectId] = useState<string | null>(null);
+  const [isIdleRotating, setIsIdleRotating] = useState(false);
 
-  // Auto-rotate functionality
+  // Calculate angle for each stage (starting at top, going clockwise)
+  const getAngleForStage = (stageId: number) => {
+    const angleStep = 360 / INNOVATION_STAGES.length;
+    return -90 + (stageId - 1) * angleStep;
+  };
+
+  // Orientation sweep animation when project is selected
   useEffect(() => {
-    if (isRingRotating) {
-      const animate = async () => {
-        await controls.start({
-          rotate: currentRotation + 360,
-          transition: {
-            duration: 20,
-            ease: 'linear',
-            repeat: Infinity,
-          },
-        });
-      };
-      animate();
-    } else {
-      controls.stop();
+    if (activeProject && activeProject.id !== prevActiveProjectId) {
+      setPrevActiveProjectId(activeProject.id);
+      setOrientationAnimating(true);
+      setShouldPulse(false);
+
+      const targetAngle = getAngleForStage(activeProject.currentStage);
+
+      // Perform sweep animation
+      sweepControls.start({
+        rotate: [0, 360],
+        transition: {
+          duration: 1.2,
+          ease: 'easeInOut',
+        },
+      }).then(() => {
+        setOrientationAnimating(false);
+        setShouldPulse(true);
+        setTimeout(() => setShouldPulse(false), 1300);
+      });
     }
-  }, [isRingRotating, controls, currentRotation]);
+  }, [activeProject?.id, activeProject?.currentStage]);
+
+  // Idle rotation - only starts after IDLE_TIMEOUT of no interaction
+  useEffect(() => {
+    const checkIdle = setInterval(() => {
+      const timeSinceInteraction = Date.now() - lastInteractionTime;
+      const shouldRotate = timeSinceInteraction > IDLE_TIMEOUT && !isOrientationAnimating;
+
+      // Respect prefers-reduced-motion
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      if (shouldRotate && !prefersReducedMotion && !isRingRotating) {
+        setIsIdleRotating(true);
+      } else {
+        setIsIdleRotating(false);
+      }
+    }, 1000);
+
+    return () => clearInterval(checkIdle);
+  }, [lastInteractionTime, isOrientationAnimating, isRingRotating]);
 
   const handleStageClick = (stageId: number) => {
+    updateLastInteraction();
+    setInteractionContext('ring');
+
     if (selectedStageId === stageId) {
-      // Deselect if clicking the same stage
       onStageClick?.(null);
     } else {
       onStageClick?.(stageId);
     }
   };
 
-  // Calculate angle for each stage (starting at top, going clockwise)
-  const getAngleForStage = (stageId: number) => {
-    // Start at top (-90 degrees) and distribute evenly
-    const angleStep = 360 / INNOVATION_STAGES.length;
-    return -90 + (stageId - 1) * angleStep;
+  const handleRingInteraction = () => {
+    updateLastInteraction();
+    setInteractionContext('ring');
   };
 
-  return (
-    <div className="relative w-full h-full flex items-center justify-center">
-      {/* Central Logo/Title */}
-      <motion.div
-        className="absolute z-10 flex flex-col items-center justify-center"
-        initial={{ opacity: 0, scale: 0 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.5, type: 'spring', stiffness: 200 }}
-      >
-        <div className="text-center">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-500 via-amber-500 to-pink-500 bg-clip-text text-transparent mb-2">
-            MUSC
-          </h1>
-          <h2 className="text-5xl font-bold text-foreground mb-2">
-            Innovation 360°
-          </h2>
-          <p className="text-sm text-muted-foreground max-w-xs">
-            Your journey from discovery to deployment
-          </p>
+  // Get contextual subtitle based on active stage
+  const getActiveStageContext = () => {
+    if (!activeProject) return null;
+    const stage = INNOVATION_STAGES.find((s) => s.id === activeProject.currentStage);
+    if (!stage) return null;
 
-          {/* Active Project Indicator */}
-          {activeProject && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-4 p-3 bg-primary/10 rounded-lg border border-primary/20"
-            >
-              <p className="text-xs text-muted-foreground">Active Project</p>
-              <p className="text-sm font-semibold text-foreground">{activeProject.name}</p>
-              <p className="text-xs text-primary">Stage {activeProject.currentStage}</p>
-            </motion.div>
-          )}
+    const verbs: Record<number, string> = {
+      1: 'Discovering clinical needs',
+      2: 'Validating market opportunity',
+      3: 'Ideating solutions',
+      4: 'Disclosing invention',
+      5: 'Developing IP protection',
+      6: 'Connecting with mentors',
+      7: 'Mapping regulatory path',
+      8: 'Accelerating development',
+      9: 'Securing resources',
+      10: 'Building and testing',
+      11: 'Evaluating in clinic',
+      12: 'Preparing to launch',
+    };
+
+    return {
+      stage,
+      verb: verbs[stage.id] || stage.title,
+    };
+  };
+
+  const stageContext = getActiveStageContext();
+
+  return (
+    <div
+      className="relative w-full h-full flex items-center justify-center transition-opacity duration-300"
+      style={{ opacity: interactionContext === 'sidebar' ? 0.5 : 1 }}
+      onMouseEnter={handleRingInteraction}
+      onClick={handleRingInteraction}
+    >
+      {/* Central Content - Contextual */}
+      <motion.div
+        className="absolute z-10 flex flex-col items-center justify-center pointer-events-none"
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.4, type: 'spring', stiffness: 200 }}
+      >
+        <div className="text-center max-w-xs">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-500 via-amber-500 to-pink-500 bg-clip-text text-transparent mb-1">
+            Innovation 360°
+          </h1>
+
+          <AnimatePresence mode="wait">
+            {stageContext ? (
+              <motion.div
+                key={`context-${activeProject?.id}-${activeProject?.currentStage}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="mt-3"
+              >
+                <p className="text-sm text-muted-foreground mb-1">
+                  Stage {stageContext.stage.id} of 12
+                </p>
+                <p className="text-base font-medium text-foreground">
+                  {stageContext.verb}
+                </p>
+                {activeProject && (
+                  <p className="text-xs text-muted-foreground mt-2 italic">
+                    {activeProject.name}
+                  </p>
+                )}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="no-project"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="mt-2"
+              >
+                <p className="text-sm text-muted-foreground">
+                  Select a project to begin
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
 
-      {/* Circular Background Ring */}
-      <motion.div
-        ref={ringRef}
+      {/* Orientation Sweep Indicator */}
+      {isOrientationAnimating && (
+        <motion.div
+          className="absolute"
+          style={{
+            width: radius * 2,
+            height: radius * 2,
+          }}
+          animate={sweepControls}
+        >
+          <svg className="absolute inset-0" style={{ width: '100%', height: '100%' }}>
+            <defs>
+              <linearGradient id="sweepGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="transparent" />
+                <stop offset="50%" stopColor="currentColor" stopOpacity="0.6" />
+                <stop offset="100%" stopColor="transparent" />
+              </linearGradient>
+            </defs>
+            <circle
+              cx="50%"
+              cy="50%"
+              r={radius}
+              fill="none"
+              stroke="url(#sweepGradient)"
+              strokeWidth="4"
+              strokeDasharray={`${Math.PI * radius * 0.15} ${Math.PI * radius * 2}`}
+              className="text-primary"
+            />
+          </svg>
+        </motion.div>
+      )}
+
+      {/* Circular Background Rings */}
+      <div
         className="absolute"
         style={{
           width: radius * 2 + 200,
           height: radius * 2 + 200,
         }}
-        animate={controls}
       >
-        {/* Decorative Circle */}
-        <svg
-          className="absolute inset-0"
-          style={{
-            width: '100%',
-            height: '100%',
-          }}
-        >
-          {/* Outer Ring */}
+        <svg className="absolute inset-0" style={{ width: '100%', height: '100%' }}>
+          {/* Outer reference ring */}
           <circle
             cx="50%"
             cy="50%"
             r={radius}
             fill="none"
             stroke="currentColor"
-            strokeWidth="2"
-            className="text-border opacity-30"
-            strokeDasharray="10 10"
-          />
-
-          {/* Inner Ring */}
-          <circle
-            cx="50%"
-            cy="50%"
-            r={radius - 20}
-            fill="none"
-            stroke="currentColor"
             strokeWidth="1"
             className="text-border opacity-20"
+            strokeDasharray="8 8"
           />
 
-          {/* Progress Ring for Active Project */}
+          {/* Progress Arc - cumulative, not animated unless changing */}
           {activeProject && (
             <motion.circle
               cx="50%"
               cy="50%"
-              r={radius}
+              r={radius - 8}
               fill="none"
               stroke="url(#progressGradient)"
-              strokeWidth="4"
+              strokeWidth="3"
               strokeLinecap="round"
-              className="opacity-80"
-              initial={{ pathLength: 0 }}
+              className="opacity-60"
+              initial={false}
               animate={{
-                pathLength: activeProject.completedStages.length / INNOVATION_STAGES.length,
+                strokeDashoffset: (1 - activeProject.completedStages.length / INNOVATION_STAGES.length) * (2 * Math.PI * (radius - 8)),
               }}
-              transition={{ duration: 1, ease: 'easeInOut' }}
+              transition={{ duration: 0.5, ease: 'easeInOut' }}
               style={{
                 transformOrigin: 'center',
                 transform: 'rotate(-90deg)',
+                strokeDasharray: 2 * Math.PI * (radius - 8),
               }}
-              strokeDasharray="1 1"
             />
           )}
 
           {/* Gradient Definition */}
           <defs>
-            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#0EA5E9" />
-              <stop offset="33%" stopColor="#FFC107" />
-              <stop offset="66%" stopColor="#E91E63" />
-              <stop offset="100%" stopColor="#FF6B35" />
+            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#0EA5E9" stopOpacity="0.8" />
+              <stop offset="33%" stopColor="#FFC107" stopOpacity="0.8" />
+              <stop offset="66%" stopColor="#E91E63" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#FF6B35" stopOpacity="0.8" />
             </linearGradient>
           </defs>
         </svg>
-      </motion.div>
-
-      {/* Stage Nodes */}
-      <div className="absolute inset-0">
-        {INNOVATION_STAGES.map((stage) => {
-          const angle = getAngleForStage(stage.id);
-          const isSelected = selectedStageId === stage.id;
-          const isActive = activeProject?.currentStage === stage.id;
-          const isCompleted = activeProject?.completedStages.includes(stage.id);
-
-          return (
-            <StageNode
-              key={stage.id}
-              stage={stage}
-              angle={angle}
-              radius={radius}
-              isSelected={isSelected}
-              isActive={isActive}
-              isCompleted={isCompleted}
-              onClick={() => handleStageClick(stage.id)}
-            />
-          );
-        })}
       </div>
 
-      {/* Connection Lines between stages (optional - can be enabled later) */}
-      {activeProject && (
-        <svg className="absolute inset-0 pointer-events-none" style={{ width: '100%', height: '100%' }}>
-          {activeProject.completedStages.map((stageId, index) => {
-            if (index === 0) return null;
-            const prevStageId = activeProject.completedStages[index - 1];
-            const angle1 = getAngleForStage(prevStageId);
-            const angle2 = getAngleForStage(stageId);
-
-            const x1 = Math.cos((angle1 * Math.PI) / 180) * radius;
-            const y1 = Math.sin((angle1 * Math.PI) / 180) * radius;
-            const x2 = Math.cos((angle2 * Math.PI) / 180) * radius;
-            const y2 = Math.sin((angle2 * Math.PI) / 180) * radius;
+      {/* Idle Rotation Container */}
+      <motion.div
+        className="absolute inset-0"
+        animate={isIdleRotating ? { rotate: 360 } : { rotate: 0 }}
+        transition={
+          isIdleRotating
+            ? {
+                duration: 120,
+                repeat: Infinity,
+                ease: 'linear',
+              }
+            : { duration: 0 }
+        }
+      >
+        {/* Stage Nodes */}
+        <div className="absolute inset-0">
+          {INNOVATION_STAGES.map((stage) => {
+            const angle = getAngleForStage(stage.id);
+            const isSelected = selectedStageId === stage.id;
+            const isActive = activeProject?.currentStage === stage.id;
+            const isCompleted = activeProject?.completedStages.includes(stage.id);
+            const justCompleted = justAdvancedStage && isCompleted && activeProject?.completedStages[activeProject.completedStages.length - 1] === stage.id;
 
             return (
-              <motion.line
-                key={`${prevStageId}-${stageId}`}
-                x1={`calc(50% + ${x1}px)`}
-                y1={`calc(50% + ${y1}px)`}
-                x2={`calc(50% + ${x2}px)`}
-                y2={`calc(50% + ${y2}px)`}
-                stroke="#10b981"
-                strokeWidth="3"
-                strokeDasharray="5 5"
-                initial={{ pathLength: 0, opacity: 0 }}
-                animate={{ pathLength: 1, opacity: 0.4 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
+              <StageNode
+                key={stage.id}
+                stage={stage}
+                angle={angle}
+                radius={radius}
+                isSelected={isSelected}
+                isActive={isActive}
+                isCompleted={isCompleted}
+                shouldPulse={shouldPulse && isActive}
+                justCompleted={justCompleted}
+                onClick={() => handleStageClick(stage.id)}
               />
             );
           })}
-        </svg>
-      )}
+        </div>
+      </motion.div>
     </div>
   );
 }
