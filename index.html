@@ -3,33 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Synapse Link</title>
+    <title>MUSC Innovation 360°</title>
+    <meta name="description" content="Human-Centered Design Program - Your journey from discovery to deployment" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   </head>
 
   <script>
-    // When deploying to GitHub Pages the application must run as a
-    // single‑page app.  We still want to deep link into the app (e.g.
-    // /#/network) so we need to ensure there is a hash present on
-    // initial page load.  However, Supabase password reset links use
-    // query parameters (access_token, refresh_token) and we must not
-    // clobber those by appending our own hash.  Only if there are no
-    // auth parameters do we redirect to the login route.
+    // Ensure hash routing for GitHub Pages deployment
     (function () {
-      var search = new URLSearchParams(location.search);
-      var hasAuthParams = search.has('access_token') || search.has('refresh_token');
-      if (!location.hash && !hasAuthParams) {
-        location.replace(location.href + '#/login');
+      if (!location.hash) {
+        location.replace(location.href + '#/');
       }
     })();
   </script>
-  <script>
-  const url = window.location.href;
-  if (url.includes("/reset-password") && !url.includes("/#/")) {
-    window.location.replace(url.replace("/reset-password", "/#/reset-password"));
-  }
-</script>
-
 
   <body>
     <!-- React mount point -->
