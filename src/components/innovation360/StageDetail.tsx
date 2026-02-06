@@ -40,7 +40,7 @@ export function StageDetail({ stageId, onClose }: StageDetailProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4"
         onClick={onClose}
       >
         <motion.div
@@ -51,38 +51,38 @@ export function StageDetail({ stageId, onClose }: StageDetailProps) {
           onClick={(e) => e.stopPropagation()}
           className="relative max-w-2xl w-full max-h-[90vh] overflow-y-auto"
         >
-          <Card className="p-6 border-2" style={{ borderColor: color }}>
+          <Card className="p-4 sm:p-6 border-2" style={{ borderColor: color }}>
             {/* Close Button */}
             <Button
               variant="ghost"
               size="icon"
-              className="absolute top-4 right-4"
+              className="absolute top-2 right-2 sm:top-4 sm:right-4 h-8 w-8 sm:h-10 sm:w-10"
               onClick={onClose}
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </Button>
 
             {/* Header */}
-            <div className="mb-6">
-              <div className="flex items-start gap-4 mb-4">
+            <div className="mb-4 sm:mb-6 pr-8 sm:pr-0">
+              <div className="flex items-start gap-3 sm:gap-4 mb-3 sm:mb-4">
                 <motion.div
-                  className="flex-shrink-0 w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-2xl shadow-lg"
+                  className="flex-shrink-0 w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-white font-bold text-xl sm:text-2xl shadow-lg"
                   style={{ backgroundColor: color }}
                   whileHover={{ scale: 1.05 }}
                 >
                   {stage.id}
                 </motion.div>
 
-                <div className="flex-1">
-                  <h2 className="text-2xl font-bold text-foreground mb-2">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg sm:text-2xl font-bold text-foreground mb-1 sm:mb-2 leading-tight">
                     {stage.title}
                   </h2>
 
-                  <div className="flex items-center gap-2 mb-2">
-                    <Building2 className="w-4 h-4 text-muted-foreground" />
+                  <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+                    <Building2 className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
                     <Badge
                       variant="outline"
-                      className="font-semibold"
+                      className="font-semibold text-[10px] sm:text-xs"
                       style={{
                         borderColor: color,
                         color: color,
@@ -93,7 +93,7 @@ export function StageDetail({ stageId, onClose }: StageDetailProps) {
                   </div>
 
                   {stage.subLabel && (
-                    <p className="text-sm text-muted-foreground italic">
+                    <p className="text-xs sm:text-sm text-muted-foreground italic">
                       {stage.subLabel}
                     </p>
                   )}
@@ -101,19 +101,19 @@ export function StageDetail({ stageId, onClose }: StageDetailProps) {
               </div>
 
               {/* Status Badges */}
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-1.5 sm:gap-2">
                 {isCompleted && (
-                  <Badge variant="default" className="bg-green-500">
+                  <Badge variant="default" className="bg-green-500 text-xs">
                     ✓ Completed
                   </Badge>
                 )}
                 {isCurrentStage && (
-                  <Badge variant="default" className="bg-blue-500">
+                  <Badge variant="default" className="bg-blue-500 text-xs">
                     Current Stage
                   </Badge>
                 )}
                 {projectsAtStage.length > 0 && (
-                  <Badge variant="secondary">
+                  <Badge variant="secondary" className="text-xs">
                     {projectsAtStage.length} {projectsAtStage.length === 1 ? 'Project' : 'Projects'}
                   </Badge>
                 )}
@@ -121,26 +121,26 @@ export function StageDetail({ stageId, onClose }: StageDetailProps) {
             </div>
 
             {/* Description */}
-            <div className="mb-6">
-              <h3 className="text-sm font-semibold text-muted-foreground mb-2">Description</h3>
-              <p className="text-foreground leading-relaxed">
+            <div className="mb-4 sm:mb-6">
+              <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground mb-1.5 sm:mb-2">Description</h3>
+              <p className="text-sm sm:text-base text-foreground leading-relaxed">
                 {stage.description}
               </p>
             </div>
 
             {/* Active Project Info */}
             {activeProject && (
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-muted-foreground mb-3">Active Project</h3>
-                <Card className="p-4 bg-accent/50">
-                  <h4 className="font-semibold text-foreground mb-2">
+              <div className="mb-4 sm:mb-6">
+                <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground mb-2 sm:mb-3">Active Project</h3>
+                <Card className="p-3 sm:p-4 bg-accent/50">
+                  <h4 className="font-semibold text-sm sm:text-base text-foreground mb-1.5 sm:mb-2">
                     {activeProject.name}
                   </h4>
-                  <p className="text-sm text-muted-foreground mb-3">
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-3">
                     {activeProject.description}
                   </p>
 
-                  <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap gap-3 sm:gap-4 text-[10px] sm:text-xs text-muted-foreground">
                     {activeProject.team && activeProject.team.length > 0 && (
                       <div className="flex items-center gap-1">
                         <Users className="w-3 h-3" />
@@ -156,11 +156,11 @@ export function StageDetail({ stageId, onClose }: StageDetailProps) {
                   </div>
 
                   {activeProject.tags && activeProject.tags.length > 0 && (
-                    <div className="flex items-center gap-2 mt-3">
+                    <div className="flex items-center gap-1.5 sm:gap-2 mt-2 sm:mt-3">
                       <Tag className="w-3 h-3 text-muted-foreground" />
                       <div className="flex flex-wrap gap-1">
                         {activeProject.tags.map((tag) => (
-                          <Badge key={tag} variant="secondary" className="text-xs">
+                          <Badge key={tag} variant="secondary" className="text-[10px] sm:text-xs">
                             {tag}
                           </Badge>
                         ))}
@@ -171,7 +171,7 @@ export function StageDetail({ stageId, onClose }: StageDetailProps) {
                   {canAdvance && (
                     <Button
                       onClick={handleAdvanceToStage}
-                      className="w-full mt-4"
+                      className="w-full mt-3 sm:mt-4 text-sm"
                       style={{ backgroundColor: color }}
                     >
                       Advance to This Stage
@@ -184,7 +184,7 @@ export function StageDetail({ stageId, onClose }: StageDetailProps) {
             {/* Projects at this stage */}
             {projectsAtStage.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold text-muted-foreground mb-3">
+                <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground mb-2 sm:mb-3">
                   Projects at This Stage
                 </h3>
                 <div className="space-y-2">
@@ -192,14 +192,14 @@ export function StageDetail({ stageId, onClose }: StageDetailProps) {
                     <Card
                       key={project.id}
                       className={cn(
-                        'p-3 cursor-pointer transition-all hover:shadow-md',
+                        'p-2.5 sm:p-3 cursor-pointer transition-all hover:shadow-md',
                         activeProjectId === project.id && 'ring-2 ring-primary'
                       )}
                     >
-                      <h4 className="font-semibold text-sm text-foreground mb-1">
+                      <h4 className="font-semibold text-xs sm:text-sm text-foreground mb-0.5 sm:mb-1">
                         {project.name}
                       </h4>
-                      <p className="text-xs text-muted-foreground line-clamp-2">
+                      <p className="text-[10px] sm:text-xs text-muted-foreground line-clamp-2">
                         {project.description}
                       </p>
                     </Card>
@@ -209,9 +209,9 @@ export function StageDetail({ stageId, onClose }: StageDetailProps) {
             )}
 
             {/* Navigation Hint */}
-            <div className="mt-6 pt-4 border-t border-border">
-              <p className="text-xs text-muted-foreground text-center">
-                Click on the ring or press ESC to close
+            <div className="mt-4 sm:mt-6 pt-3 sm:pt-4 border-t border-border">
+              <p className="text-[10px] sm:text-xs text-muted-foreground text-center">
+                Click outside or press ESC to close
               </p>
             </div>
           </Card>

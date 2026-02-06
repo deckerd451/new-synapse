@@ -6,15 +6,48 @@ import { useInnovation360Store } from '@/stores/innovation360Store';
 import { cn } from '@/lib/utils';
 
 interface CircularRingProps {
-  radius?: number;
   onStageClick?: (stageId: number) => void;
 }
 
 const IDLE_TIMEOUT = 15000; // 15 seconds before idle rotation starts
 
-export function CircularRing({ radius = 280, onStageClick }: CircularRingProps) {
+export function CircularRing({ onStageClick }: CircularRingProps) {
   const sweepControls = useAnimation();
   const ringRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Responsive radius based on viewport
+  const [radius, setRadius] = useState(280);
+
+  useEffect(() => {
+    const updateRadius = () => {
+      if (!containerRef.current) return;
+
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const minDimension = Math.min(width, height);
+
+      // Calculate radius based on viewport, accounting for sidebar and padding
+      let newRadius: number;
+
+      if (width < 640) {
+        // Mobile: small radius
+        newRadius = Math.min(minDimension * 0.35, 160);
+      } else if (width < 1024) {
+        // Tablet: medium radius
+        newRadius = Math.min(minDimension * 0.32, 220);
+      } else {
+        // Desktop: full radius
+        newRadius = Math.min(minDimension * 0.28, 280);
+      }
+
+      setRadius(newRadius);
+    };
+
+    updateRadius();
+    window.addEventListener('resize', updateRadius);
+    return () => window.removeEventListener('resize', updateRadius);
+  }, []);
 
   const {
     selectedStageId,
@@ -116,6 +149,7 @@ export function CircularRing({ radius = 280, onStageClick }: CircularRingProps) 
 
   return (
     <div
+      ref={containerRef}
       className="relative w-full h-full flex items-center justify-center transition-opacity duration-300"
       style={{ opacity: interactionContext === 'sidebar' ? 0.5 : 1 }}
       onMouseEnter={handleRingInteraction}
@@ -123,13 +157,13 @@ export function CircularRing({ radius = 280, onStageClick }: CircularRingProps) 
     >
       {/* Central Content - Contextual */}
       <motion.div
-        className="absolute z-10 flex flex-col items-center justify-center pointer-events-none"
+        className="absolute z-10 flex flex-col items-center justify-center pointer-events-none px-4"
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.4, type: 'spring', stiffness: 200 }}
       >
         <div className="text-center max-w-xs">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-500 via-amber-500 to-pink-500 bg-clip-text text-transparent mb-1">
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-cyan-500 via-amber-500 to-pink-500 bg-clip-text text-transparent mb-1">
             Innovation 360°
           </h1>
 
@@ -141,16 +175,16 @@ export function CircularRing({ radius = 280, onStageClick }: CircularRingProps) 
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.3 }}
-                className="mt-3"
+                className="mt-2 sm:mt-3"
               >
-                <p className="text-sm text-muted-foreground mb-1">
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">
                   Stage {stageContext.stage.id} of 12
                 </p>
-                <p className="text-base font-medium text-foreground">
+                <p className="text-sm sm:text-base font-medium text-foreground">
                   {stageContext.verb}
                 </p>
                 {activeProject && (
-                  <p className="text-xs text-muted-foreground mt-2 italic">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-1.5 sm:mt-2 italic line-clamp-2">
                     {activeProject.name}
                   </p>
                 )}
@@ -163,7 +197,7 @@ export function CircularRing({ radius = 280, onStageClick }: CircularRingProps) 
                 exit={{ opacity: 0, y: -10 }}
                 className="mt-2"
               >
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   Select a project to begin
                 </p>
               </motion.div>
