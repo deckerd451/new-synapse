@@ -47,15 +47,15 @@ export function StageNode({
   // Visual properties based on status - responsive sizing
   const getBaseSize = () => {
     const width = window.innerWidth;
-    if (width < 640) return 50; // Mobile
+    if (width < 640) return 42; // Mobile - smaller to fit all 12 circles
     if (width < 1024) return 60; // Tablet
     return 70; // Desktop
   };
 
   const baseSize = getBaseSize();
   let nodeSize = baseSize;
-  if (isActive && hasActiveProject) nodeSize = baseSize * 1.25;
-  if (isSelected) nodeSize = baseSize * 1.4;
+  if (isActive && hasActiveProject) nodeSize = baseSize * 1.2;
+  if (isSelected) nodeSize = baseSize * 1.3;
 
   // Determine if this circle should be dashed
   const isDashed = stageStatus === 'neutral' || stageStatus === 'pending';
@@ -127,15 +127,15 @@ export function StageNode({
       <div
         className={cn(
           'relative flex items-center justify-center rounded-full transition-all duration-300',
-          isSelected && 'ring-4 ring-white/40 ring-offset-4 ring-offset-background'
+          isSelected && 'ring-2 sm:ring-4 ring-white/40 ring-offset-2 sm:ring-offset-4 ring-offset-background'
         )}
         style={{
           width: nodeSize,
           height: nodeSize,
           // Fill color based on status
           backgroundColor: isFilled ? color : 'transparent',
-          // Border style: dashed or solid
-          borderWidth: '3px',
+          // Border style: dashed or solid (thinner on mobile)
+          borderWidth: window.innerWidth < 640 ? '2.5px' : '3px',
           borderStyle: isDashed ? 'dashed' : 'solid',
           borderColor: color,
           // Opacity adjustments

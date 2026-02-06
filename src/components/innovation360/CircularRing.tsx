@@ -25,20 +25,25 @@ export function CircularRing({ onStageClick }: CircularRingProps) {
 
       const width = window.innerWidth;
       const height = window.innerHeight;
-      const minDimension = Math.min(width, height);
 
-      // Calculate radius based on viewport, accounting for sidebar and padding
+      // Account for header height (approx 48px on mobile, 56px on desktop)
+      const headerHeight = width < 640 ? 48 : 56;
+      const availableHeight = height - headerHeight;
+
+      const minDimension = Math.min(width, availableHeight);
+
+      // Calculate radius based on viewport, with extra padding for mobile
       let newRadius: number;
 
       if (width < 640) {
-        // Mobile: small radius
-        newRadius = Math.min(minDimension * 0.35, 160);
+        // Mobile: much smaller radius with generous padding for all 12 circles
+        newRadius = Math.min((minDimension * 0.28) - 40, 140);
       } else if (width < 1024) {
         // Tablet: medium radius
-        newRadius = Math.min(minDimension * 0.32, 220);
+        newRadius = Math.min((minDimension * 0.32) - 20, 220);
       } else {
         // Desktop: full radius
-        newRadius = Math.min(minDimension * 0.28, 280);
+        newRadius = Math.min((minDimension * 0.28), 280);
       }
 
       setRadius(newRadius);
@@ -162,8 +167,8 @@ export function CircularRing({ onStageClick }: CircularRingProps) {
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.4, type: 'spring', stiffness: 200 }}
       >
-        <div className="text-center max-w-xs">
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-cyan-500 via-amber-500 to-pink-500 bg-clip-text text-transparent mb-1">
+        <div className="text-center max-w-[200px] sm:max-w-xs">
+          <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-cyan-500 via-amber-500 to-pink-500 bg-clip-text text-transparent mb-1">
             Innovation 360°
           </h1>
 
@@ -175,16 +180,16 @@ export function CircularRing({ onStageClick }: CircularRingProps) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.3 }}
-                className="mt-2 sm:mt-3"
+                className="mt-1 sm:mt-2 lg:mt-3"
               >
-                <p className="text-xs sm:text-sm text-muted-foreground mb-1">
+                <p className="text-[10px] sm:text-xs lg:text-sm text-muted-foreground mb-0.5 sm:mb-1">
                   Stage {stageContext.stage.id} of 12
                 </p>
-                <p className="text-sm sm:text-base font-medium text-foreground">
+                <p className="text-xs sm:text-sm lg:text-base font-medium text-foreground leading-tight">
                   {stageContext.verb}
                 </p>
                 {activeProject && (
-                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-1.5 sm:mt-2 italic line-clamp-2">
+                  <p className="text-[9px] sm:text-[10px] lg:text-xs text-muted-foreground mt-1 sm:mt-1.5 lg:mt-2 italic line-clamp-2">
                     {activeProject.name}
                   </p>
                 )}
@@ -195,9 +200,9 @@ export function CircularRing({ onStageClick }: CircularRingProps) {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="mt-2"
+                className="mt-1 sm:mt-2"
               >
-                <p className="text-xs sm:text-sm text-muted-foreground">
+                <p className="text-[10px] sm:text-xs lg:text-sm text-muted-foreground">
                   Select a project to begin
                 </p>
               </motion.div>

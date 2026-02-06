@@ -56,9 +56,9 @@ export default function Innovation360Page() {
   }, [updateLastInteraction]);
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-background">
+    <div className="relative w-full h-screen overflow-hidden bg-background flex flex-col">
       {/* Header */}
-      <header className="absolute top-0 left-0 right-0 z-40 flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 bg-background/80 backdrop-blur-sm border-b border-border">
+      <header className="flex-shrink-0 w-full flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 bg-background border-b border-border z-40">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-cyan-500 via-amber-500 to-pink-500 rounded-lg flex-shrink-0" />
@@ -89,7 +89,7 @@ export default function Innovation360Page() {
       </header>
 
       {/* Main Content */}
-      <div className="flex h-full pt-12 sm:pt-14">
+      <div className="flex flex-1 min-h-0 relative">
         {/* Sidebar */}
         <AnimatePresence>
           {sidebarOpen && (
@@ -107,7 +107,7 @@ export default function Innovation360Page() {
 
         {/* Circular Ring Visualization */}
         <div className="flex-1 relative overflow-hidden">
-          <div className="absolute inset-0 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+          <div className="absolute inset-0 flex items-center justify-center">
             <CircularRing
               onStageClick={(stageId) => {
                 setSelectedStage(stageId);
