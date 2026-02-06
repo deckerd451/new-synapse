@@ -44,18 +44,11 @@ export function StageNode({
     return 'pending'; // Dashed
   })();
 
-  // Visual properties based on status - responsive sizing
-  const getBaseSize = () => {
-    const width = window.innerWidth;
-    if (width < 640) return 42; // Mobile - smaller to fit all 12 circles
-    if (width < 1024) return 60; // Tablet
-    return 70; // Desktop
-  };
-
-  const baseSize = getBaseSize();
+  // Visual properties based on status
+  const baseSize = 70;
   let nodeSize = baseSize;
-  if (isActive && hasActiveProject) nodeSize = baseSize * 1.2;
-  if (isSelected) nodeSize = baseSize * 1.3;
+  if (isActive && hasActiveProject) nodeSize = baseSize * 1.25;
+  if (isSelected) nodeSize = baseSize * 1.4;
 
   // Determine if this circle should be dashed
   const isDashed = stageStatus === 'neutral' || stageStatus === 'pending';
@@ -96,27 +89,26 @@ export function StageNode({
           initial={{ opacity: 0, y: 5 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0 }}
-          className="absolute z-50 px-2 sm:px-3 py-1.5 sm:py-2 bg-popover border border-border rounded-lg shadow-lg pointer-events-none max-w-[200px] sm:max-w-[220px]"
+          className="absolute z-50 px-3 py-2 bg-popover border border-border rounded-lg shadow-lg pointer-events-none"
           style={{
             left: '50%',
             transform: 'translateX(-50%)',
-            top: nodeSize / 2 + 12,
+            top: nodeSize / 2 + 16,
+            width: '220px',
           }}
         >
-          <p className="text-[10px] sm:text-xs font-semibold text-foreground mb-0.5 sm:mb-1 leading-tight">
-            {stage.title}
-          </p>
-          <p className="text-[9px] sm:text-[10px] text-muted-foreground mb-1 line-clamp-2 leading-snug">
+          <p className="text-xs font-semibold text-foreground mb-1">{stage.title}</p>
+          <p className="text-[10px] text-muted-foreground mb-1 line-clamp-2">
             {stage.description.split('.')[0]}
           </p>
-          <div className="flex items-center gap-1 mt-1">
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full" style={{ backgroundColor: color }} />
-            <span className="text-[8px] sm:text-[9px] text-muted-foreground uppercase tracking-wide">
+          <div className="flex items-center gap-1 mt-1.5">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+            <span className="text-[9px] text-muted-foreground uppercase tracking-wide">
               {stage.department}
             </span>
           </div>
           {stageContext.deliverables && (
-            <p className="text-[8px] sm:text-[9px] text-muted-foreground mt-0.5 sm:mt-1 italic leading-tight">
+            <p className="text-[9px] text-muted-foreground mt-1 italic">
               {stageContext.deliverables}
             </p>
           )}
@@ -127,15 +119,15 @@ export function StageNode({
       <div
         className={cn(
           'relative flex items-center justify-center rounded-full transition-all duration-300',
-          isSelected && 'ring-2 sm:ring-4 ring-white/40 ring-offset-2 sm:ring-offset-4 ring-offset-background'
+          isSelected && 'ring-4 ring-white/40 ring-offset-4 ring-offset-background'
         )}
         style={{
           width: nodeSize,
           height: nodeSize,
           // Fill color based on status
           backgroundColor: isFilled ? color : 'transparent',
-          // Border style: dashed or solid (thinner on mobile)
-          borderWidth: window.innerWidth < 640 ? '2.5px' : '3px',
+          // Border style: dashed or solid
+          borderWidth: '3px',
           borderStyle: isDashed ? 'dashed' : 'solid',
           borderColor: color,
           // Opacity adjustments
@@ -150,7 +142,7 @@ export function StageNode({
               className={cn(
                 'font-bold drop-shadow-lg transition-all',
                 isFilled ? 'text-white' : 'text-muted-foreground',
-                isSelected ? 'text-xl sm:text-2xl' : isActive ? 'text-lg sm:text-xl' : 'text-base sm:text-lg'
+                isSelected ? 'text-2xl' : isActive ? 'text-xl' : 'text-lg'
               )}
             >
               {stage.id}
@@ -163,10 +155,10 @@ export function StageNode({
           <motion.div
             initial={{ scale: 0, rotate: -180 }}
             animate={{ scale: 1, rotate: 0 }}
-            className="absolute -top-0.5 sm:-top-1 -right-0.5 sm:-right-1 bg-green-600 rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center border-2 border-background shadow-md"
+            className="absolute -top-1 -right-1 bg-green-600 rounded-full w-6 h-6 flex items-center justify-center border-2 border-background shadow-md"
           >
             <svg
-              className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-white"
+              className="w-3.5 h-3.5 text-white"
               fill="none"
               strokeLinecap="round"
               strokeLinejoin="round"

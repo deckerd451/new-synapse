@@ -1,0 +1,317 @@
+/* =========================================================
+   INNOVATION 360 MOBILE-ONLY OVERRIDES (<= 768px)
+
+   DO NOT modify desktop styles above 1024px
+   All changes are scoped to mobile viewports only
+   ========================================================= */
+
+@media (max-width: 768px) {
+
+  /* ========================================
+     1. ROOT LAYOUT - Full viewport + centering
+     ======================================== */
+
+  body {
+    min-height: 100svh;
+    min-height: 100vh; /* Fallback for older browsers */
+    overflow: hidden;
+  }
+
+  /* Main page container - full viewport */
+  .relative.w-full.h-screen {
+    min-height: 100svh;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+
+    /* iOS safe-area support */
+    padding-top: env(safe-area-inset-top, 0);
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-left: env(safe-area-inset-left, 0);
+    padding-right: env(safe-area-inset-right, 0);
+  }
+
+  /* ========================================
+     2. COMPACT MOBILE HEADER
+     ======================================== */
+
+  /* Reduce header height on mobile */
+  header {
+    position: relative !important; /* Override absolute positioning */
+    flex-shrink: 0;
+    min-height: 3rem !important;
+    padding: 0.5rem 0.75rem !important;
+    gap: 0.5rem;
+  }
+
+  /* Ensure hamburger and theme toggle have 44px touch targets */
+  header button {
+    min-width: 44px;
+    min-height: 44px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Compact title on mobile */
+  header h1 {
+    font-size: 0.9rem !important;
+    line-height: 1.2;
+  }
+
+  /* Hide subtitle on very small screens */
+  header p {
+    display: none !important;
+  }
+
+  /* ========================================
+     3. MAIN CONTENT AREA - Fill remaining height
+     ======================================== */
+
+  /* Main content fills remaining viewport */
+  .flex.h-full.pt-14,
+  .flex.h-full {
+    flex: 1 1 auto;
+    padding-top: 0 !important; /* Remove top padding since header is relative now */
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* Allow flex shrinking */
+  }
+
+  /* Sidebar adjustments for mobile */
+  .absolute.lg\:relative.z-30 {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(280px, 80vw) !important;
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
+  /* ========================================
+     4. VISUALIZATION CONTAINER - Hero element
+     ======================================== */
+
+  /* Make viz container fill available space and center content */
+  .flex-1.relative {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    overflow: hidden;
+    min-height: 0; /* Allow flex shrinking */
+  }
+
+  /* Remove absolute positioning from viz wrapper */
+  .flex-1.relative > .absolute.inset-0 {
+    position: relative !important;
+    inset: auto !important;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    padding: 0 !important;
+  }
+
+  /* Responsive visualization sizing */
+  .flex-1.relative > .absolute.inset-0.flex {
+    --mobile-viz-size: min(
+      calc(100vw - 2rem),
+      calc(100svh - 5rem),
+      520px
+    );
+
+    width: var(--mobile-viz-size) !important;
+    height: var(--mobile-viz-size) !important;
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  /* Ensure visualization scales up on mobile */
+  .flex-1.relative svg,
+  .flex-1.relative canvas {
+    max-width: 100% !important;
+    max-height: 100% !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  /* ========================================
+     5. TYPOGRAPHY HIERARCHY - Stronger on mobile
+     ======================================== */
+
+  /* Center content - "Select a project to begin" */
+  .flex-1.relative .text-muted-foreground {
+    font-size: 1rem !important;
+    font-weight: 500;
+    color: hsl(var(--foreground)) !important;
+    opacity: 0.7;
+  }
+
+  /* Stage title in center */
+  .flex-1.relative .text-2xl,
+  .flex-1.relative .text-xl {
+    font-size: 1.25rem !important;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  /* Stage number/subtitle */
+  .flex-1.relative .text-xs,
+  .flex-1.relative .text-sm.text-muted-foreground {
+    font-size: 0.8rem !important;
+    font-weight: 600;
+  }
+
+  /* Ensure text doesn't overflow */
+  .flex-1.relative .max-w-xs {
+    max-width: 90vw !important;
+    text-align: center;
+  }
+
+  /* ========================================
+     6. STAGE NODES - Touch-friendly sizing
+     ======================================== */
+
+  /* Ensure stage circles are large enough to tap */
+  [role="button"]:has(circle),
+  .flex-1.relative button {
+    min-width: 44px;
+    min-height: 44px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ========================================
+     7. REMOVE EXCESS SPACING
+     ======================================== */
+
+  /* Remove any large margins that push content down */
+  .flex-1.relative .p-8 {
+    padding: 0.5rem !important;
+  }
+
+  /* Remove background decoration padding on mobile */
+  .flex-1.relative .absolute.inset-0.pointer-events-none {
+    padding: 0 !important;
+  }
+
+  /* ========================================
+     8. SIDEBAR IMPROVEMENTS
+     ======================================== */
+
+  /* Ensure sidebar is scrollable on mobile */
+  .absolute.lg\:relative.z-30 {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Add backdrop overlay when sidebar is open */
+  .absolute.lg\:relative.z-30::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: -1;
+    pointer-events: none;
+  }
+}
+
+/* ========================================
+   SMALL MOBILE (<= 480px) - Extra compaction
+   ======================================== */
+
+@media (max-width: 480px) {
+
+  /* Even more compact header */
+  header {
+    min-height: 2.75rem !important;
+    padding: 0.4rem 0.6rem !important;
+  }
+
+  header h1 {
+    font-size: 0.85rem !important;
+  }
+
+  /* Tighter visualization padding */
+  .flex-1.relative {
+    padding: 0.5rem !important;
+  }
+
+  /* Adjust viz size for very small screens */
+  .flex-1.relative > .absolute.inset-0.flex {
+    --mobile-viz-size: min(
+      calc(100vw - 1rem),
+      calc(100svh - 4rem),
+      420px
+    ) !important;
+  }
+}
+
+/* ========================================
+   LANDSCAPE ORIENTATION - Prevent clipping
+   ======================================== */
+
+@media (max-width: 768px) and (orientation: landscape) {
+
+  /* Adjust visualization to fit landscape viewport */
+  .flex-1.relative > .absolute.inset-0.flex {
+    --mobile-viz-size: min(
+      calc(100vh - 4rem),
+      calc(100vw - 2rem),
+      480px
+    ) !important;
+  }
+
+  /* More compact header in landscape */
+  header {
+    min-height: 2.5rem !important;
+    padding: 0.4rem 0.75rem !important;
+  }
+
+  /* Tighter padding */
+  .flex-1.relative {
+    padding: 0.5rem !important;
+  }
+}
+
+/* ========================================
+   REDUCED MOTION SUPPORT
+   ======================================== */
+
+@media (prefers-reduced-motion: reduce) {
+
+  /* Disable all animations on mobile if user prefers reduced motion */
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  /* Remove motion from sidebar */
+  .absolute.lg\:relative.z-30 {
+    transition: none !important;
+  }
+}
+
+/* ========================================
+   DEBUG (temporarily uncomment to visualize)
+   ======================================== */
+
+/*
+@media (max-width: 768px) {
+  header {
+    outline: 2px solid red !important;
+  }
+
+  .flex.h-full {
+    outline: 2px solid blue !important;
+  }
+
+  .flex-1.relative {
+    outline: 2px solid green !important;
+  }
+
+  .flex-1.relative > .absolute.inset-0 {
+    outline: 2px solid orange !important;
+  }
+}
+*/
