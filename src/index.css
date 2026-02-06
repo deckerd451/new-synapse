@@ -176,3 +176,211 @@ canvas {
   .synapse-bg { animation: none !important; }
 }
 
+
+/* ========================================
+   MOBILE INNOVATION 360 UI IMPROVEMENTS
+   ======================================== */
+
+/* Main layout with safe-area support */
+.mobile-innovation-layout {
+  position: relative;
+  width: 100%;
+  min-height: 100svh;
+  min-height: 100vh; /* Fallback */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: hsl(var(--background));
+  
+  /* iOS safe-area support */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Compact mobile header */
+.mobile-innovation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 0.5rem clamp(0.75rem, 3vw, 1rem);
+  background: hsl(var(--background));
+  border-bottom: 1px solid hsl(var(--border));
+  z-index: 40;
+  gap: 0.75rem;
+  /* Compact height on mobile */
+  min-height: 3rem;
+}
+
+@media (min-width: 640px) {
+  .mobile-innovation-header {
+    min-height: 3.5rem;
+    padding: 0.75rem 1rem;
+  }
+}
+
+.mobile-innovation-header-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.mobile-innovation-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.mobile-innovation-logo {
+  width: 1.75rem;
+  height: 1.75rem;
+  background: linear-gradient(to bottom right, #0EA5E9, #FFC107, #E91E63);
+  border-radius: 0.5rem;
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .mobile-innovation-logo {
+    width: 2rem;
+    height: 2rem;
+  }
+}
+
+.mobile-innovation-title {
+  font-size: clamp(0.875rem, 2.5vw, 1rem);
+  font-weight: 700;
+  color: hsl(var(--foreground));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+/* Touch-friendly icon buttons - 44px minimum */
+.mobile-innovation-icon-button {
+  display: flex;
+  align-items: center;
+  justify-center;
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: 0.5rem;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  transition: background-color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-innovation-icon-button:active {
+  background: hsl(var(--accent) / 0.1);
+  transform: scale(0.95);
+}
+
+@media (hover: hover) {
+  .mobile-innovation-icon-button:hover {
+    background: hsl(var(--accent) / 0.05);
+  }
+}
+
+.mobile-innovation-theme-toggle {
+  flex-shrink: 0;
+}
+
+/* Main content area - properly centered */
+.mobile-innovation-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.mobile-innovation-sidebar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: min(280px, 85vw);
+  background: hsl(var(--background));
+  border-right: 1px solid hsl(var(--border));
+  box-shadow: 0 0 2rem rgba(0, 0, 0, 0.5);
+  z-index: 30;
+}
+
+@media (min-width: 640px) {
+  .mobile-innovation-sidebar {
+    width: 320px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .mobile-innovation-sidebar {
+    position: relative;
+    box-shadow: none;
+  }
+}
+
+/* Visualization container - true centering */
+.mobile-innovation-viz-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-center;
+  position: relative;
+  overflow: hidden;
+  padding: clamp(1rem, 3vw, 2rem);
+}
+
+/* Adjust visualization sizing for mobile */
+.mobile-innovation-viz-container > div {
+  width: min(92vw, 560px);
+  height: min(calc(100svh - 5rem), 62svh, 560px);
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 1 / 1;
+}
+
+@media (max-width: 480px) {
+  .mobile-innovation-viz-container > div {
+    width: min(95vw, 400px);
+    height: min(calc(100svh - 4rem), 65svh, 400px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .mobile-innovation-viz-container > div {
+    width: min(80vw, 640px);
+    height: min(80vh, 640px);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .mobile-innovation-layout * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Landscape orientation adjustments */
+@media (max-width: 896px) and (max-height: 480px) and (orientation: landscape) {
+  .mobile-innovation-viz-container > div {
+    height: min(70vh, 380px);
+    width: min(70vh, 380px);
+  }
+  
+  .mobile-innovation-header {
+    min-height: 2.5rem;
+    padding: 0.375rem 0.75rem;
+  }
+}
