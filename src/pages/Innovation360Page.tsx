@@ -16,7 +16,13 @@ export default function Innovation360Page() {
     updateLastInteraction,
   } = useInnovation360Store();
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Sidebar open by default on desktop, closed on mobile
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 1024;
+    }
+    return true;
+  });
 
   // ESC key to close detail view
   useEffect(() => {
@@ -50,15 +56,17 @@ export default function Innovation360Page() {
   }, [updateLastInteraction]);
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-background">
+    <div className="relative w-full h-screen overflow-hidden bg-background flex flex-col">
       {/* Header */}
-      <header className="absolute top-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3 bg-background/80 backdrop-blur-sm border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 via-amber-500 to-pink-500 rounded-lg" />
-            <div>
-              <h1 className="text-base font-bold text-foreground">MUSC Innovation 360°</h1>
-              <p className="text-[10px] text-muted-foreground hidden sm:block">
+      <header className="flex-shrink-0 w-full flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 bg-background border-b border-border z-40">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-cyan-500 via-amber-500 to-pink-500 rounded-lg flex-shrink-0" />
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-base font-bold text-foreground truncate">
+                MUSC Innovation 360°
+              </h1>
+              <p className="text-[9px] sm:text-[10px] text-muted-foreground hidden sm:block">
                 Human-Centered Design Program
               </p>
             </div>
@@ -71,9 +79,9 @@ export default function Innovation360Page() {
               setSidebarOpen(!sidebarOpen);
               updateLastInteraction();
             }}
-            className="lg:hidden"
+            className="lg:hidden flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10"
           >
-            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {sidebarOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5" />}
           </Button>
         </div>
 
@@ -81,7 +89,7 @@ export default function Innovation360Page() {
       </header>
 
       {/* Main Content */}
-      <div className="flex h-full pt-14">
+      <div className="flex flex-1 min-h-0 relative">
         {/* Sidebar */}
         <AnimatePresence>
           {sidebarOpen && (
@@ -90,7 +98,7 @@ export default function Innovation360Page() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: -320, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="absolute lg:relative z-30 h-full w-80 border-r border-border bg-background shadow-2xl lg:shadow-none"
+              className="absolute lg:relative z-30 h-full w-[280px] sm:w-80 border-r border-border bg-background shadow-2xl lg:shadow-none"
             >
               <ProjectSidebar onClose={() => setSidebarOpen(false)} />
             </motion.div>
@@ -98,10 +106,9 @@ export default function Innovation360Page() {
         </AnimatePresence>
 
         {/* Circular Ring Visualization */}
-        <div className="flex-1 relative">
-          <div className="absolute inset-0 flex items-center justify-center p-8">
+        <div className="flex-1 relative overflow-hidden">
+          <div className="absolute inset-0 flex items-center justify-center">
             <CircularRing
-              radius={280}
               onStageClick={(stageId) => {
                 setSelectedStage(stageId);
                 updateLastInteraction();
