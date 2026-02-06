@@ -265,7 +265,7 @@ canvas {
 .mobile-innovation-icon-button {
   display: flex;
   align-items: center;
-  justify-center;
+  justify-content: center;
   flex-shrink: 0;
   min-width: 44px;
   min-height: 44px;
@@ -334,7 +334,7 @@ canvas {
   flex: 1;
   display: flex;
   align-items: center;
-  justify-center;
+  justify-content: center;
   position: relative;
   overflow: hidden;
   padding: clamp(1rem, 3vw, 2rem);
