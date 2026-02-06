@@ -56,40 +56,36 @@ export default function Innovation360Page() {
   }, [updateLastInteraction]);
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-background flex flex-col">
+    <div className="mobile-innovation-layout">
       {/* Header */}
-      <header className="flex-shrink-0 w-full flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 bg-background border-b border-border z-40">
-        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-6 h-6 sm:w-8 sm:h-8 bg-gradient-to-br from-cyan-500 via-amber-500 to-pink-500 rounded-lg flex-shrink-0" />
-            <div className="min-w-0">
-              <h1 className="text-sm sm:text-base font-bold text-foreground truncate">
-                MUSC Innovation 360°
-              </h1>
-              <p className="text-[9px] sm:text-[10px] text-muted-foreground hidden sm:block">
-                Human-Centered Design Program
-              </p>
-            </div>
+      <header className="mobile-innovation-header">
+        <div className="mobile-innovation-header-content">
+          <div className="mobile-innovation-title-group">
+            <div className="mobile-innovation-logo" />
+            <h1 className="mobile-innovation-title">
+              MUSC Innovation 360°
+            </h1>
           </div>
 
-          <Button
-            variant="ghost"
-            size="icon"
+          <button
             onClick={() => {
               setSidebarOpen(!sidebarOpen);
               updateLastInteraction();
             }}
-            className="lg:hidden flex-shrink-0 h-8 w-8 sm:h-10 sm:w-10"
+            className="mobile-innovation-icon-button lg:hidden"
+            aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
           >
-            {sidebarOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5" />}
-          </Button>
+            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
 
-        <ThemeToggle />
+        <div className="mobile-innovation-theme-toggle">
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* Main Content */}
-      <div className="flex flex-1 min-h-0 relative">
+      <div className="mobile-innovation-main">
         {/* Sidebar */}
         <AnimatePresence>
           {sidebarOpen && (
@@ -98,7 +94,7 @@ export default function Innovation360Page() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: -320, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="absolute lg:relative z-30 h-full w-[280px] sm:w-80 border-r border-border bg-background shadow-2xl lg:shadow-none"
+              className="mobile-innovation-sidebar"
             >
               <ProjectSidebar onClose={() => setSidebarOpen(false)} />
             </motion.div>
@@ -106,8 +102,8 @@ export default function Innovation360Page() {
         </AnimatePresence>
 
         {/* Circular Ring Visualization */}
-        <div className="flex-1 relative overflow-hidden">
-          <div className="absolute inset-0 flex items-center justify-center">
+        <div className="mobile-innovation-viz-container">
+          <div className="w-full h-full">
             <CircularRing
               onStageClick={(stageId) => {
                 setSelectedStage(stageId);
@@ -117,7 +113,7 @@ export default function Innovation360Page() {
           </div>
 
           {/* Subtle Background Decoration */}
-          <div className="absolute inset-0 pointer-events-none opacity-[0.03]">
+          <div className="absolute inset-0 pointer-events-none opacity-[0.03] -z-10">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-radial from-cyan-500/30 via-transparent to-transparent rounded-full blur-3xl" />
           </div>
         </div>

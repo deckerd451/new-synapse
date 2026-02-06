@@ -200,11 +200,13 @@ export function CircularRing({ onStageClick }: CircularRingProps) {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="mt-1 sm:mt-2"
+                className="mt-2 sm:mt-3 lg:mt-4"
               >
-                <p className="text-[10px] sm:text-xs lg:text-sm text-muted-foreground">
-                  Select a project to begin
-                </p>
+                <div className="px-4 py-2.5 sm:px-6 sm:py-3 rounded-full bg-accent/20 border border-accent/30 backdrop-blur-sm">
+                  <p className="text-sm sm:text-base lg:text-lg font-medium text-foreground">
+                    Select a project to begin
+                  </p>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
