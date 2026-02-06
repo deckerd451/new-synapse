@@ -16,13 +16,7 @@ export default function Innovation360Page() {
     updateLastInteraction,
   } = useInnovation360Store();
 
-  // Sidebar open by default on desktop, closed on mobile
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth >= 1024;
-    }
-    return true;
-  });
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // ESC key to close detail view
   useEffect(() => {
@@ -56,36 +50,38 @@ export default function Innovation360Page() {
   }, [updateLastInteraction]);
 
   return (
-    <div className="mobile-innovation-layout">
+    <div className="relative w-full h-screen overflow-hidden bg-background">
       {/* Header */}
-      <header className="mobile-innovation-header">
-        <div className="mobile-innovation-header-content">
-          <div className="mobile-innovation-title-group">
-            <div className="mobile-innovation-logo" />
-            <h1 className="mobile-innovation-title">
-              MUSC Innovation 360°
-            </h1>
+      <header className="absolute top-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3 bg-background/80 backdrop-blur-sm border-b border-border">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-cyan-500 via-amber-500 to-pink-500 rounded-lg" />
+            <div>
+              <h1 className="text-base font-bold text-foreground">MUSC Innovation 360°</h1>
+              <p className="text-[10px] text-muted-foreground hidden sm:block">
+                Human-Centered Design Program
+              </p>
+            </div>
           </div>
 
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => {
               setSidebarOpen(!sidebarOpen);
               updateLastInteraction();
             }}
-            className="mobile-innovation-icon-button lg:hidden"
-            aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+            className="lg:hidden"
           >
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
+          </Button>
         </div>
 
-        <div className="mobile-innovation-theme-toggle">
-          <ThemeToggle />
-        </div>
+        <ThemeToggle />
       </header>
 
       {/* Main Content */}
-      <div className="mobile-innovation-main">
+      <div className="flex h-full pt-14">
         {/* Sidebar */}
         <AnimatePresence>
           {sidebarOpen && (
@@ -94,7 +90,7 @@ export default function Innovation360Page() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: -320, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="mobile-innovation-sidebar"
+              className="absolute lg:relative z-30 h-full w-80 border-r border-border bg-background shadow-2xl lg:shadow-none"
             >
               <ProjectSidebar onClose={() => setSidebarOpen(false)} />
             </motion.div>
@@ -102,9 +98,10 @@ export default function Innovation360Page() {
         </AnimatePresence>
 
         {/* Circular Ring Visualization */}
-        <div className="mobile-innovation-viz-container">
-          <div className="w-full h-full">
+        <div className="flex-1 relative">
+          <div className="absolute inset-0 flex items-center justify-center p-8">
             <CircularRing
+              radius={280}
               onStageClick={(stageId) => {
                 setSelectedStage(stageId);
                 updateLastInteraction();
@@ -113,7 +110,7 @@ export default function Innovation360Page() {
           </div>
 
           {/* Subtle Background Decoration */}
-          <div className="absolute inset-0 pointer-events-none opacity-[0.03] -z-10">
+          <div className="absolute inset-0 pointer-events-none opacity-[0.03]">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-gradient-radial from-cyan-500/30 via-transparent to-transparent rounded-full blur-3xl" />
           </div>
         </div>
